@@ -1,0 +1,4 @@
+name: hello
+version: 1.0.0
+description: Test module for v3.0.0
+enabled: true
