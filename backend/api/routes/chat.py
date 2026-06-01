@@ -1,0 +1,198 @@
+"""Chat API — JSON mode подход (как в v23)"""
+import json
+import re
+import time
+from fastapi import APIRouter
+from pydantic import BaseModel
+from structlog import get_logger
+
+log = get_logger()
+router = APIRouter()
+
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str = "default"
+
+
+class ChatResponse(BaseModel):
+    response: str
+    status: str
+    voice: dict | None = None
+    visual: dict | None = None
+    tool_calls: list[str] = []
+
+
+HEALTH_KEYWORDS = ["здоров", "состояни", "аналитик", "проблем", "авари", "диагност", "отчёт", "что с", "как дела"]
+
+
+def is_health_query(text: str) -> bool:
+    lower = text.lower()
+    return any(kw in lower for kw in HEALTH_KEYWORDS)
+
+
+def _extract_json(text: str) -> dict | None:
+    """Извлекает JSON из ответа LLM (как в v23)"""
+    if not text:
+        return None
+
+    # Убираем markdown code blocks
+    text = re.sub(r'''```(?:json)?\s*''', ' ', text)
+    text = re.sub(r'''\s*```$''', '', text).strip()
+
+    # Прямой парсинг
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict) and "score" in data:
+            return data
+    except json.JSONDecodeError:
+        pass
+
+    # Ищем JSON внутри текста
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and start < end:
+        try:
+            data = json.loads(text[start:end + 1])
+            if isinstance(data, dict) and "score" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest):
+    log.info("Chat request", message=req.message, session=req.session_id)
+
+    try:
+        from core.llm import get_provider
+        provider = get_provider()
+    except Exception as e:
+        log.error("LLM provider failed", error=str(e))
+        return ChatResponse(
+            response=f"⚠️ LLM не настроен: {e}",
+            status="error",
+        )
+
+    if is_health_query(req.message):
+        return await handle_health_query(req.message, provider)
+
+    # Простой запрос — без Tool Use
+    try:
+        system = "Ты — AI-ассистент для оператора SCADA-системы. Отвечай на русском, кратко."
+        text = await provider.generate(system, req.message)
+        return ChatResponse(response=text or "Не удалось получить ответ.", status="ok")
+    except Exception as e:
+        log.error("Simple chat failed", error=str(e))
+        return ChatResponse(response=f"⚠️ Ошибка: {e}", status="error")
+
+
+async def handle_health_query(message: str, provider) -> ChatResponse:
+    """Health-запрос: собираем данные → LLM → JSON → рендер"""
+    try:
+        from modules.health.prompts import HEALTH_SYSTEM_PROMPT
+        from modules.health.data_collectors import collect_all_health_data
+        from modules.health.analysis import compute_health_report, HealthReport
+        from modules.health.renderers import render_all
+    except Exception as e:
+        log.error("Health module import failed", error=str(e))
+        return ChatResponse(response=f"⚠️ Модуль health недоступен: {e}", status="error")
+
+    # 1. Собираем данные из БД
+    log.info("Collecting health data from DB")
+    t_start = time.time()
+    try:
+        data = await collect_all_health_data(period_hours=24)
+    except Exception as e:
+        log.error("Data collection failed", error=str(e))
+        return ChatResponse(response=f"⚠️ Не удалось собрать данные из БД: {e}", status="error")
+
+    env = data.get("environmental", {})
+    equip = data.get("equipment", {})
+    alarms = data.get("alarms_summary", {})
+
+    log.info("Data collected",
+             alarms=alarms.get("total", 0),
+             online=equip.get("online", 0),
+             offline=equip.get("offline", 0),
+             chattering=equip.get("chattering", 0))
+
+    # 2. Формируем контекст для LLM
+    context_json = json.dumps(data, ensure_ascii=False, indent=2, default=str)
+    user_message = f"Данные для анализа за последние {data['period_hours']} часа:\n\n```json\n{context_json}\n```\n\nПроанализируй и верни JSON согласно формату."
+
+    # 3. ОДИН запрос к LLM
+    t_llm = time.time()
+    try:
+        response_text = await provider.generate(
+            system=HEALTH_SYSTEM_PROMPT,
+            user=user_message,
+        )
+        log.info("LLM response received", length=len(response_text), preview=response_text[:200])
+    except Exception as e:
+        log.error("LLM call failed", error=str(e))
+        # Fallback на детерминированный расчёт
+        report = compute_health_report(data)
+        rendered = render_all(report)
+        return ChatResponse(
+            response=rendered["narrative"]["text"],
+            status="ok",
+            voice=rendered["voice"],
+            visual=rendered["visual"],
+            tool_calls=["fallback_to_deterministic"],
+        )
+
+    # 4. Парсим JSON
+    parsed = _extract_json(response_text)
+
+    if parsed:
+        log.info("JSON parsed from LLM", score=parsed.get("score"), status=parsed.get("status"))
+        
+        # ВАЖНО: life_support ВСЕГДА считаем на основе РЕАЛЬНЫХ данных из БД, не LLM
+        from modules.health.analysis import _compute_life_support_index
+        real_life_support = _compute_life_support_index(env)
+        log.info("life_support computed from real env", 
+                 score=real_life_support.get("score"),
+                 status=real_life_support.get("status"))
+        
+        report = HealthReport(
+            score=parsed.get("score", 50),
+            status=parsed.get("status", "UNKNOWN"),
+            summary=parsed.get("summary", ""),
+            issues=parsed.get("issues", []),
+            stats=parsed.get("stats", {}),
+            environmental=parsed.get("environmental", env),
+            equipment=parsed.get("equipment", equip),
+            alarms=parsed.get("alarms", alarms),
+            energy=parsed.get("energy", {}),
+            recommendations=parsed.get("recommendations", []),
+            sub_scores=parsed.get("sub_scores", {}),
+            life_support=real_life_support,  # Всегда из реальных данных!
+        )
+    else:
+        log.warning("Failed to parse JSON from LLM, using fallback")
+        report = compute_health_report(data)
+
+    # 5. Рендерим отчёт
+    rendered = render_all(report)
+
+    # 6. Обновляем системную инфу для сайдбара
+    try:
+        from api.routes.system import update_last_health_check
+        update_last_health_check(
+            duration_sec=round(time.time() - t_start, 2),
+            score=report.score,
+        )
+    except Exception as e:
+        log.warning("Failed to update last health check", error=str(e))
+
+    # 7. Возвращаем ответ
+    return ChatResponse(
+        response=rendered["narrative"]["text"],
+        status="ok",
+        voice=rendered["voice"],
+        visual=rendered["visual"],
+        tool_calls=["collect_all_health_data", "llm_analyze"],
+    )

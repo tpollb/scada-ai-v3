@@ -1,0 +1,17 @@
+name: health
+version: 1.0.0
+description: Анализ здоровья системы по историческим данным из БД
+enabled: true
+
+# Пороговые значения для health score
+thresholds:
+  critical_score: 30    # ниже = CRITICAL
+  warning_score: 60     # ниже = WARNING, выше = GOOD
+  chattering_min_changes: 20  # изменений за период = дребезг
+  stuck_min_hours: 24    # часов без изменений = залипание (для аналоговых)
+
+# Периоды анализа по умолчанию
+default_periods:
+  alarms_hours: 24
+  events_hours: 24
+  changes_hours: 24

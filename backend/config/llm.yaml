@@ -1,0 +1,24 @@
+# Конфигурация LLM-провайдеров
+# Все credentials и настройки читаются из .env (см. settings.py)
+# Здесь только переключение активного провайдера
+
+active: yandex
+
+providers:
+  yandex:
+    # Все параметры берутся из .env:
+    # - YANDEX_API_KEY
+    # - YANDEX_FOLDER_ID
+    # - YANDEX_GPT_MODEL
+    # - LLM_TEMPERATURE
+    # - LLM_MAX_TOKENS
+    # - LLM_TIMEOUT
+    # Можно переопределить здесь если нужно (опционально)
+
+  # openai:
+  #   # OPENAI_API_KEY в .env
+  #   model: "gpt-4o"
+
+  # anthropic:
+  #   # ANTHROPIC_API_KEY в .env
+  #   model: "claude-3-5-sonnet-20241022"

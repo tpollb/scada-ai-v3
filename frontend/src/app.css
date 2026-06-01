@@ -1,11 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #f0f9ff;
-  --color-primary-100: #e0f2fe;
-  --color-primary-500: #0ea5e9;
-  --color-primary-600: #0284c7;
-  --color-primary-700: #0369a1;
+  --color-neutral-50: #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+  
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-green-600: #16a34a;
+  --color-red-600: #dc2626;
+  --color-amber-600: #d97706;
 }
 
 :root {
@@ -19,15 +30,26 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Inter, system-ui, -apple-system, sans-serif;
-  color: #1f2937;
-  background-color: #f9fafb;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: #171717;
+  background-color: #fafafa;
 }
 
-/* Убеждаемся, что текст всегда видимый */
-.text-gray-900 { color: #111827 !important; }
-.text-gray-700 { color: #374151 !important; }
-.text-gray-600 { color: #4b5563 !important; }
+/* Строгий инженерный стиль */
+.font-mono {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Убираем "детские" цвета */
+.text-gray-900 { color: #171717 !important; }
+.text-gray-700 { color: #404040 !important; }
+.text-gray-600 { color: #525252 !important; }
+.text-gray-500 { color: #737373 !important; }
+
 .bg-white { background-color: #ffffff !important; }
-.bg-gray-50 { background-color: #f9fafb !important; }
-.bg-gray-100 { background-color: #f3f4f6 !important; }
+.bg-gray-50 { background-color: #fafafa !important; }
+.bg-gray-100 { background-color: #f5f5f5 !important; }
+
+/* Строгие границы */
+.border-gray-200 { border-color: #e5e5e5 !important; }
+.border-gray-300 { border-color: #d4d4d4 !important; }

@@ -1,9 +1,24 @@
 <script lang="ts">
   import { messages } from '../stores/chat'
   import { User, Bot } from 'lucide-svelte'
+  import { tick } from 'svelte'
+
+  let container = $state<HTMLDivElement | null>(null)
+
+  // Автопрокрутка при изменении messages
+  $effect(() => {
+    const len = $messages.length
+    if (len > 0 && container) {
+      tick().then(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight
+        }
+      })
+    }
+  })
 </script>
 
-<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<div bind:this={container} class="flex-1 overflow-y-auto p-4 space-y-4">
   {#each $messages as msg (msg.id)}
     <div class="flex gap-3 {msg.role === 'user' ? 'justify-end' : ''}">
       {#if msg.role === 'assistant'}
@@ -27,7 +42,7 @@
     <div class="text-center text-gray-600 mt-20">
       <Bot size={48} class="mx-auto mb-4 text-gray-400" />
       <p class="text-gray-700 font-medium">Начните диалог</p>
-      <p class="text-sm text-gray-500 mt-1">Например: "привет"</p>
+      <p class="text-sm text-gray-500 mt-1">Например: "покажи здоровье здания"</p>
     </div>
   {/if}
 </div>
