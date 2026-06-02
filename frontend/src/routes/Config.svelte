@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { navigate } from '../stores/ui'
-  import { ArrowLeft, RefreshCw, Save, AlertCircle, CheckCircle, Server, Database, Key } from 'lucide-svelte'
+  import { ArrowLeft, RefreshCw, Save, AlertCircle, CheckCircle, Server, Database, Key, Sun, Moon } from 'lucide-svelte'
+  import { theme } from '../stores/theme'
   import api from '../lib/api'
 
   interface ModuleInfo {
@@ -166,7 +167,7 @@
   let selected = $derived(modules.find(m => m.name === selectedModule))
 </script>
 
-<div class="flex flex-col h-screen bg-neutral-50">
+<div class="flex flex-col h-screen bg-neutral-50 dark:bg-neutral-900 transition-colors">
   <header class="bg-white border-b border-neutral-200 px-6 py-4 flex items-center gap-4">
     <button type="button" onclick={() => navigate('operator')} class="p-2 rounded hover:bg-neutral-100 transition">
       <ArrowLeft size={20} class="text-neutral-700" />

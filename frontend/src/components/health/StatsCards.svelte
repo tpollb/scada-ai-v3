@@ -18,11 +18,11 @@
   {#each cards as card}
     {@const value = data?.[card.key] ?? 0}
     {@const isAlert = (card.key === 'high_alarms' && value > 0) || (card.key === 'broken_sensors' && value > 0)}
-    <div class="bg-white border rounded p-4 {isAlert ? 'border-red-300 bg-red-50' : 'border-neutral-200'}">
-      <div class="text-xs text-neutral-500 uppercase tracking-wide mb-2">
+    <div class="bg-white dark:bg-neutral-800 border rounded p-4 transition-colors {isAlert ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-neutral-200 dark:border-neutral-700'}">
+      <div class="text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-2">
         {card.label}
       </div>
-      <div class="text-3xl font-bold tabular-nums {isAlert ? 'text-red-700' : 'text-neutral-900'}">{value}</div>
+      <div class="text-3xl font-bold tabular-nums {isAlert ? 'text-red-700 dark:text-red-400' : 'text-neutral-900 dark:text-neutral-100'}">{value}</div>
     </div>
   {/each}
 </div>

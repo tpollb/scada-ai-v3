@@ -5,14 +5,11 @@
 
   let container = $state<HTMLDivElement | null>(null)
 
-  // Автопрокрутка при изменении messages
   $effect(() => {
     const len = $messages.length
     if (len > 0 && container) {
       tick().then(() => {
-        if (container) {
-          container.scrollTop = container.scrollHeight
-        }
+        if (container) container.scrollTop = container.scrollHeight
       })
     }
   })
@@ -22,27 +19,27 @@
   {#each $messages as msg (msg.id)}
     <div class="flex gap-3 {msg.role === 'user' ? 'justify-end' : ''}">
       {#if msg.role === 'assistant'}
-        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-          <Bot size={16} class="text-blue-600" />
+        <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+          <Bot size={16} class="text-blue-600 dark:text-blue-400" />
         </div>
       {/if}
-      <div class="max-w-[70%] px-4 py-2 rounded-2xl {msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'}">
-        <p class="whitespace-pre-wrap">{msg.content}</p>
+      <div class="max-w-[70%] px-4 py-2 rounded-2xl {msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-neutral-800 text-gray-900 dark:text-neutral-100'}">
+        <div class="whitespace-pre-wrap">{msg.content}</div>
         <p class="text-xs mt-1 opacity-60">{new Date(msg.timestamp).toLocaleTimeString()}</p>
       </div>
       {#if msg.role === 'user'}
-        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-          <User size={16} class="text-gray-700" />
+        <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0">
+          <User size={16} class="text-gray-700 dark:text-neutral-300" />
         </div>
       {/if}
     </div>
   {/each}
 
   {#if $messages.length === 0}
-    <div class="text-center text-gray-600 mt-20">
-      <Bot size={48} class="mx-auto mb-4 text-gray-400" />
-      <p class="text-gray-700 font-medium">Начните диалог</p>
-      <p class="text-sm text-gray-500 mt-1">Например: "покажи здоровье здания"</p>
+    <div class="text-center text-gray-600 dark:text-neutral-400 mt-20">
+      <Bot size={48} class="mx-auto mb-4 text-gray-400 dark:text-neutral-600" />
+      <p class="text-gray-700 dark:text-neutral-300 font-medium">Начните диалог</p>
+      <p class="text-sm text-gray-500 dark:text-neutral-500 mt-1">Например: "покажи здоровье здания"</p>
     </div>
   {/if}
 </div>

@@ -14,35 +14,35 @@
   }
 </script>
 
-<div class="bg-white border border-neutral-200 rounded">
-  <div class="px-4 py-3 border-b border-neutral-200 flex items-center justify-between">
-    <h3 class="text-sm font-semibold text-neutral-900">
+<div class="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded transition-colors">
+  <div class="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
+    <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
       Обнаруженные проблемы
     </h3>
-    <span class="text-xs text-neutral-500 tabular-nums">{issues.length}</span>
+    <span class="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">{issues.length}</span>
   </div>
 
   {#if issues.length === 0}
-    <div class="p-8 text-center text-neutral-500 text-sm">
+    <div class="p-8 text-center text-neutral-500 dark:text-neutral-400 text-sm">
       Проблем не обнаружено
     </div>
   {:else}
-    <div class="divide-y divide-neutral-100">
+    <div class="divide-y divide-neutral-100 dark:divide-neutral-700">
       {#each issues as issue}
         <div class="p-4 border-l-4 {severityColors[issue.severity] || 'border-l-neutral-400'}">
           <div class="flex items-start gap-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
-                <span class="text-xs font-semibold uppercase text-neutral-500">
+                <span class="text-xs font-semibold uppercase text-neutral-500 dark:text-neutral-400">
                   {issue.category}
                 </span>
-                <span class="text-xs px-2 py-0.5 bg-neutral-100 text-neutral-700 rounded font-medium">
+                <span class="text-xs px-2 py-0.5 bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded font-medium">
                   {issue.severity}
                 </span>
               </div>
-              <h4 class="font-semibold text-neutral-900 mb-1">{issue.title}</h4>
-              <p class="text-sm text-neutral-700 mb-2">{issue.details}</p>
-              <div class="text-sm text-neutral-600 bg-neutral-50 rounded p-2">
+              <h4 class="font-semibold text-neutral-900 dark:text-neutral-100 mb-1">{issue.title}</h4>
+              <p class="text-sm text-neutral-700 dark:text-neutral-300 mb-2">{issue.details}</p>
+              <div class="text-sm text-neutral-600 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 rounded p-2">
                 <span class="font-medium">Рекомендация:</span> {issue.recommendation}
               </div>
             </div>
