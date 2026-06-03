@@ -220,3 +220,139 @@ html.dark .bg-black { background-color: rgba(0, 0, 0, 0.75) !important; }
 :root:not(.dark) ::-webkit-scrollbar-track { background: #fafafa; }
 :root:not(.dark) ::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 5px; }
 :root:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #a3a3a3; }
+
+
+/* ================================================================ */
+/* ИСПРАВЛЕНИЯ для СВЕТЛОЙ темы — переопределяем тёмные артефакты   */
+/* ================================================================ */
+
+/* Иконка пользователя в чате */
+:root:not(.dark) .bg-gray-200 { 
+  background-color: #e5e5e5 !important; 
+}
+:root:not(.dark) .text-gray-700 { 
+  color: #404040 !important; 
+}
+
+/* Круговые диаграммы индексов (фон кольца) */
+:root:not(.dark) .text-neutral-200 { 
+  color: #e5e5e5 !important; 
+}
+:root:not(.dark) .text-neutral-300 { 
+  color: #d4d4d4 !important; 
+}
+
+/* Модальные окна и drilldown */
+:root:not(.dark) .bg-black { 
+  background-color: rgba(0, 0, 0, 0.5) !important; 
+}
+:root:not(.dark) .bg-opacity-50 { 
+  background-color: rgba(0, 0, 0, 0.5) !important; 
+}
+:root:not(.dark) .bg-opacity-60 { 
+  background-color: rgba(0, 0, 0, 0.6) !important; 
+}
+
+/* Таблицы в drilldown */
+:root:not(.dark) table {
+  color: #171717 !important;
+}
+:root:not(.dark) thead {
+  background-color: #fafafa !important;
+}
+:root:not(.dark) tbody {
+  background-color: #ffffff !important;
+}
+:root:not(.dark) tr {
+  background-color: #ffffff !important;
+}
+:root:not(.dark) tr:hover {
+  background-color: #f5f5f5 !important;
+}
+
+/* Sticky headers в таблицах */
+:root:not(.dark) .sticky {
+  background-color: #fafafa !important;
+}
+
+/* Кнопки и интерактивные элементы */
+:root:not(.dark) button:not([class*="bg-"]):not([style*="background"]) {
+  background-color: transparent !important;
+  color: #171717 !important;
+}
+
+/* Поля ввода в модалках */
+:root:not(.dark) input:not([type="checkbox"]):not([type="radio"]),
+:root:not(.dark) textarea,
+:root:not(.dark) select {
+  background-color: #ffffff !important;
+  color: #171717 !important;
+  border-color: #d4d4d4 !important;
+}
+
+/* Чекбоксы (toggle switches) */
+:root:not(.dark) input[type="checkbox"] + div {
+  background-color: #e5e5e5 !important;
+}
+:root:not(.dark) input[type="checkbox"]:checked + div {
+  background-color: #2563eb !important;
+}
+
+/* Ссылки и акценты */
+:root:not(.dark) a {
+  color: #2563eb !important;
+}
+:root:not(.dark) .text-blue-600 {
+  color: #2563eb !important;
+}
+
+/* Красные/оранжевые/зелёные акценты в светлой теме */
+:root:not(.dark) .text-red-600,
+:root:not(.dark) .text-red-700 { 
+  color: #dc2626 !important; 
+}
+:root:not(.dark) .text-amber-600,
+:root:not(.dark) .text-amber-700 { 
+  color: #d97706 !important; 
+}
+:root:not(.dark) .text-green-600,
+:root:not(.dark) .text-green-700 { 
+  color: #16a34a !important; 
+}
+
+/* Фон карточек и панелей */
+:root:not(.dark) .rounded {
+  background-color: #ffffff !important;
+}
+:root:not(.dark) .rounded-lg {
+  background-color: #ffffff !important;
+}
+
+/* Границы */
+:root:not(.dark) .border {
+  border-color: #e5e5e5 !important;
+}
+:root:not(.dark) .border-b {
+  border-bottom-color: #e5e5e5 !important;
+}
+:root:not(.dark) .border-t {
+  border-top-color: #e5e5e5 !important;
+}
+:root:not(.dark) .border-l {
+  border-left-color: #e5e5e5 !important;
+}
+:root:not(.dark) .border-r {
+  border-right-color: #e5e5e5 !important;
+}
+
+
+/* Белый текст в светлой теме (для активных кнопок) */
+:root:not(.dark) .text-white {
+  color: #ffffff !important;
+}
+:root:not(.dark) .bg-neutral-900 {
+  background-color: #171717 !important;
+}
+:root:not(.dark) .border-neutral-900 {
+  border-color: #171717 !important;
+}

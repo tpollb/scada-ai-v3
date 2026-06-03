@@ -79,13 +79,41 @@ async def chat(req: ChatRequest):
     if is_health_query(req.message):
         return await handle_health_query(req.message, provider)
 
-    # Простой запрос — без Tool Use
+    # Проверяем есть ли tools
+    from core.tool_executor import get_executor
+    executor = get_executor()
+    tools_schemas = executor.get_schemas()
+    
+    system = "Ты — AI-ассистент для оператора SCADA-системы. Отвечай на русском, кратко. Используй доступные инструменты когда это уместно."
+    
     try:
-        system = "Ты — AI-ассистент для оператора SCADA-системы. Отвечай на русском, кратко."
-        text = await provider.generate(system, req.message)
-        return ChatResponse(response=text or "Не удалось получить ответ.", status="ok")
+        if tools_schemas:
+            # Запрос с Tool Use
+            log.info("Using tool calling", tools_count=len(tools_schemas))
+            result = await provider.generate_with_tools(
+                system=system,
+                user=req.message,
+                tools=tools_schemas,
+                tool_executor=executor,
+                max_iterations=5,
+            )
+            
+            tool_names = [tc.name for tc in result.get("tool_calls", [])]
+            if tool_names:
+                log.info("Tools were called", tools=tool_names)
+            
+            return ChatResponse(
+                response=result.get("text") or "Не удалось получить ответ.",
+                status="ok",
+                tool_calls=tool_names,
+            )
+        else:
+            # Простой запрос — без Tool Use
+            log.info("No tools available, using simple generate")
+            text = await provider.generate(system, req.message)
+            return ChatResponse(response=text or "Не удалось получить ответ.", status="ok")
     except Exception as e:
-        log.error("Simple chat failed", error=str(e))
+        log.error("Chat failed", error=str(e))
         return ChatResponse(response=f"⚠️ Ошибка: {e}", status="error")
 
 

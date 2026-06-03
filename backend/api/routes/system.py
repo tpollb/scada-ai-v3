@@ -1,91 +1,172 @@
-"""System API — информация для инфопанели сайдбара"""
-from fastapi import APIRouter
+"""System API — информация о системе и логи"""
+from fastapi import APIRouter, HTTPException
 from datetime import datetime
 from structlog import get_logger
 from pathlib import Path
-import yaml
 
 log = get_logger()
 router = APIRouter(prefix="/system", tags=["system"])
 
-
-# In-memory кэш последнего health-запроса (для отображения в сайдбаре)
 _last_health_check = {"timestamp": None, "duration_sec": None, "score": None}
 
-
 def update_last_health_check(duration_sec: float, score: int | None):
-    """Вызывается из chat.py после каждого health-запроса"""
     _last_health_check["timestamp"] = datetime.now().isoformat()
     _last_health_check["duration_sec"] = round(duration_sec, 2)
     _last_health_check["score"] = score
 
 
 @router.get("/info")
-async def get_system_info():
-    """Информация о системе для инфопанели"""
+async def system_info():
+    from config.settings import settings
     from core.module_registry import get_registry
     from core.tool_executor import get_executor
-    from core.db import get_pool
-    from config.settings import settings
     
     registry = get_registry()
     executor = get_executor()
     
-    # Проверяем статус БД
+    # === Проверка БД ===
     db_status = "unknown"
-    db_stats = None
     try:
+        from core.db import get_pool
         pool = await get_pool()
         async with pool.acquire() as conn:
-            # Проверяем живость
             await conn.fetchval("SELECT 1")
-            # Считаем теги
-            tags_count = await conn.fetchval("SELECT COUNT(*) FROM tags_dict")
-            db_status = "ok"
-            db_stats = {"tags_count": tags_count}
+        db_status = "ok"
     except Exception as e:
         db_status = "error"
-        log.warning("DB status check failed", error=str(e))
+        log.warning("DB check failed", error=str(e))
     
-    # Проверяем статус LLM
+    # === Проверка LLM ===
     llm_status = "unknown"
     try:
         from core.llm import get_provider
         provider = get_provider()
-        ok = await provider.health_check()
-        llm_status = "ok" if ok else "error"
-    except Exception:
-        llm_status = "not_configured"
-    
-    # Список реальных возможностей (на основе загруженных модулей)
-    capabilities = []
-    
-    if "health" in registry._modules:
-        capabilities.extend([
-            {"text": "покажи здоровье здания", "category": "health"},
-            {"text": "какие аварии за сутки?", "category": "health"},
-            {"text": "температура и влажность", "category": "health"},
-            {"text": "битые датчики", "category": "health"},
-            {"text": "топ аварий", "category": "health"},
-        ])
-    
-    # Навигационные подсказки (всегда доступны)
-    capabilities.extend([
-        {"text": "открой конфигуратор", "category": "navigation", "action": "config"},
-    ])
+        if provider and getattr(provider, 'provider_name', None):
+            llm_status = "ok"
+        elif not settings.yandex_api_key:
+            llm_status = "not_configured"
+        else:
+            llm_status = "error"
+    except Exception as e:
+        llm_status = "error"
+        log.warning("LLM check failed", error=str(e))
     
     return {
         "app_name": settings.app_name,
         "app_version": settings.app_version,
         "modules": list(registry._modules.keys()),
         "tools_count": len(executor._tools),
-        "db_status": db_status,
-        "db_stats": db_stats,
         "db_host": settings.db_host,
-        "llm_status": llm_status,
+        "db_status": db_status,
         "llm_model": settings.yandex_gpt_model,
+        "llm_status": llm_status,
         "scada_url": settings.scada_base_url,
         "last_health_check": _last_health_check,
-        "capabilities": capabilities,
-        "server_time": datetime.now().isoformat(),
+        "server_time": datetime.now().isoformat()
+    }
+
+
+@router.get("/logs/files")
+async def list_log_files():
+    from core.logger import system_logger
+    files = system_logger.list_files()
+    return {"count": len(files), "files": files}
+
+
+@router.get("/logs/current")
+async def get_current_logs(limit: int = 100, level: str | None = None):
+    from core.logger import system_logger
+    logs = system_logger.get_logs(limit=limit, level=level)
+    return {"count": len(logs), "logs": logs, "source": "current", "file": system_logger.current_file.name}
+
+
+@router.get("/logs/file/{filename}")
+async def get_log_file(filename: str, limit: int = 1000):
+    from core.logger import system_logger
+    try:
+        logs = system_logger.read_file(filename, limit=limit)
+        return {"count": len(logs), "logs": logs, "source": "file", "file": filename}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Log file not found: {filename}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/logs/config")
+async def logs_config():
+    from core.logger import system_logger
+    return {
+        "logs_dir": str(system_logger.current_file.parent),
+        "current_file": system_logger.current_file.name,
+    }
+
+
+@router.post("/logs/clear")
+async def clear_logs():
+    from core.logger import system_logger
+    system_logger.clear()
+    return {"status": "ok", "message": "Буфер очищен"}
+
+@router.put("/logs/config")
+async def update_logs_config(poll_interval_ms: int = 2000):
+    """Update logs module settings"""
+    from config.settings import settings
+    
+    # Update runtime value
+    settings.log_poll_interval_ms = poll_interval_ms
+    
+    # Update .env
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    if env_path.exists():
+        content = env_path.read_text(encoding="utf-8")
+        if "LOG_POLL_INTERVAL_MS=" in content:
+            import re
+            content = re.sub(
+                r"LOG_POLL_INTERVAL_MS=\d+",
+                f"LOG_POLL_INTERVAL_MS={poll_interval_ms}",
+                content
+            )
+        else:
+            content = content.rstrip() + f"\nLOG_POLL_INTERVAL_MS={poll_interval_ms}\n"
+        env_path.write_text(content, encoding="utf-8", newline="\n")
+    
+    log.info("Logs config updated", poll_interval_ms=poll_interval_ms)
+    
+    return {
+        "status": "ok",
+        "message": f"Интервал polling обновлён: {poll_interval_ms} мс",
+        "restart_required": False,
+        "config": {
+            "poll_interval_ms": poll_interval_ms,
+        }
+    }
+
+@router.put("/logs/config")
+async def update_logs_config(poll_interval_ms: int = 2000):
+    """Update logs module settings"""
+    from config.settings import settings
+    
+    settings.log_poll_interval_ms = poll_interval_ms
+    
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    if env_path.exists():
+        content = env_path.read_text(encoding="utf-8")
+        if "LOG_POLL_INTERVAL_MS=" in content:
+            import re as _re
+            content = _re.sub(
+                r"LOG_POLL_INTERVAL_MS=\d+",
+                f"LOG_POLL_INTERVAL_MS={poll_interval_ms}",
+                content
+            )
+        else:
+            content = content.rstrip() + f"\nLOG_POLL_INTERVAL_MS={poll_interval_ms}\n"
+        env_path.write_text(content, encoding="utf-8", newline="\n")
+    
+    log.info("Logs config updated", poll_interval_ms=poll_interval_ms)
+    
+    return {
+        "status": "ok",
+        "message": f"Интервал polling обновлён: {poll_interval_ms} мс",
+        "restart_required": False,
+        "config": {"poll_interval_ms": poll_interval_ms},
     }

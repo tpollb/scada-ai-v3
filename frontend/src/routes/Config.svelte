@@ -89,6 +89,7 @@
   })
 
   onMount(async () => {
+    await loadLogsConfig()
     await Promise.all([loadModules(), loadEnv()])
     loading = false
   })
@@ -164,7 +165,74 @@
     }
   }
 
+  // === Управление состоянием модулей ===
+  let togglingModule = $state<string | null>(null)
+  let moduleMessage = $state<{type: 'success' | 'error' | 'info', text: string} | null>(null)
+  
+  async function toggleModule(moduleName: string, enabled: boolean) {
+    togglingModule = moduleName
+    moduleMessage = null
+    try {
+      const resp: any = await api.put(`config/modules/${moduleName}/enabled`, {
+        json: { enabled }
+      }).json()
+      
+      if (resp.status === 'error') {
+        moduleMessage = { type: 'error', text: resp.message }
+      } else {
+        moduleMessage = { 
+          type: resp.restart_required ? 'info' : 'success', 
+          text: resp.message 
+        }
+        // Обновляем локально
+        const mod = modules.find(m => m.name === moduleName)
+        if (mod) {
+          mod.enabled = enabled
+          mod.status = enabled ? 'loaded' : 'not_loaded'
+        }
+      }
+      
+      setTimeout(() => moduleMessage = null, 8000)
+    } catch (e: any) {
+      moduleMessage = { type: 'error', text: e?.message || 'Ошибка переключения' }
+      setTimeout(() => moduleMessage = null, 5000)
+    } finally {
+      togglingModule = null
+    }
+  }
+
+
   let selected = $derived(modules.find(m => m.name === selectedModule))
+
+  // === Logs module settings ===
+  let logPollInterval = $state(2000)
+  let logPollSaving = $state(false)
+  let logPollMessage = $state<{type: 'success' | 'error', text: string} | null>(null)
+  
+  async function loadLogsConfig() {
+    try {
+      const resp: any = await api.get('system/logs/config').json()
+      logPollInterval = resp.poll_interval_ms ?? 2000
+    } catch (e) {
+      console.error('Failed to load logs config:', e)
+    }
+  }
+  
+  async function saveLogsPollInterval() {
+    logPollSaving = true
+    logPollMessage = null
+    try {
+      const resp: any = await api.put(`system/logs/config?poll_interval_ms=${logPollInterval}`).json()
+      logPollMessage = { type: 'success', text: resp.message || 'Сохранено' }
+      setTimeout(() => logPollMessage = null, 4000)
+    } catch (e: any) {
+      logPollMessage = { type: 'error', text: e?.message || 'Ошибка сохранения' }
+      setTimeout(() => logPollMessage = null, 5000)
+    } finally {
+      logPollSaving = false
+    }
+  }
+
 </script>
 
 <div class="flex flex-col h-screen bg-neutral-50 dark:bg-neutral-900 transition-colors">
@@ -174,7 +242,7 @@
     </button>
     <div class="flex items-center gap-3 flex-1">
       <h1 class="text-xl font-semibold text-neutral-900">Конфигуратор</h1>
-      <span class="text-sm text-neutral-500">v3.0.0</span>
+      <span class="text-sm text-neutral-500">v3.0.1</span>
     </div>
     <div class="flex gap-1 bg-neutral-100 rounded p-1">
       <button
@@ -194,7 +262,17 @@
     </div>
   </header>
 
-  {#if saveMessage}
+        {#if moduleMessage}
+        <div class="px-6 py-3 border-b text-sm {
+          moduleMessage.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100' :
+          moduleMessage.type === 'info' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100' :
+          'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100'
+        }">
+          {moduleMessage.text}
+        </div>
+      {/if}
+
+      {#if saveMessage}
     <div class="px-6 py-3 bg-blue-50 border-b border-blue-200 text-sm text-blue-900">
       {saveMessage}
     </div>
@@ -213,29 +291,44 @@
         {:else}
           <div class="divide-y divide-neutral-100">
             {#each modules as mod}
-              <button
-                type="button"
-                onclick={() => selectModule(mod.name)}
-                class="w-full text-left p-4 hover:bg-neutral-50 transition {selectedModule === mod.name ? 'bg-neutral-100' : ''}"
-              >
-                <div class="flex items-start justify-between mb-1">
-                  <span class="font-medium text-neutral-900">{mod.name}</span>
-                  {#if mod.status === 'loaded'}
-                    <CheckCircle size={16} class="text-green-600 flex-shrink-0" />
-                  {:else}
-                    <AlertCircle size={16} class="text-neutral-400 flex-shrink-0" />
+              <div class="flex items-start justify-between gap-2 p-4 hover:bg-neutral-50 transition {selectedModule === mod.name ? 'bg-neutral-100' : ''}">
+                <button
+                  type="button"
+                  onclick={() => selectModule(mod.name)}
+                  class="flex-1 text-left min-w-0"
+                >
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="font-medium text-neutral-900">{mod.name}</span>
+                    {#if mod.status === 'loaded'}
+                      <CheckCircle size={14} class="text-green-600 flex-shrink-0" />
+                    {:else}
+                      <AlertCircle size={14} class="text-neutral-400 flex-shrink-0" />
+                    {/if}
+                  </div>
+                  <div class="text-xs text-neutral-500 mb-1 font-mono">v{mod.version}</div>
+                  {#if mod.description}
+                    <div class="text-xs text-neutral-600">{mod.description}</div>
                   {/if}
-                </div>
-                <div class="text-xs text-neutral-500 mb-1 font-mono">v{mod.version}</div>
-                {#if mod.description}
-                  <div class="text-xs text-neutral-600">{mod.description}</div>
-                {/if}
-                {#if mod.error}
-                  <div class="text-xs text-red-600 mt-1">{mod.error}</div>
-                {/if}
-              </button>
+                  {#if mod.error}
+                    <div class="text-xs text-red-600 mt-1">{mod.error}</div>
+                  {/if}
+                </button>
+                
+                <!-- Toggle switch -->
+                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+                  <input 
+                    type="checkbox" 
+                    class="sr-only peer" 
+                    checked={mod.enabled}
+                    disabled={togglingModule === mod.name}
+                    onchange={(e) => toggleModule(mod.name, e.currentTarget.checked)}
+                  />
+                  <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 {togglingModule === mod.name ? 'opacity-50' : ''}"></div>
+                </label>
+              </div>
             {/each}
-          </div>
+
+</div>
         {/if}
       </aside>
 
@@ -260,6 +353,51 @@
                 Перезагрузить
               </button>
             </div>
+
+          <!-- Logs module settings -->
+          {#if selected?.name === 'logs'}
+            <div class="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
+              <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                Настройки
+              </h3>
+
+              <div>
+                <label class="block">
+                  <span class="block text-xs font-semibold text-neutral-900 dark:text-neutral-100 mb-1">
+                    Интервал обновления логов (мс)
+                  </span>
+                  <input
+                    type="number"
+                    bind:value={logPollInterval}
+                    min="500"
+                    max="10000"
+                    step="500"
+                    class="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </label>
+                <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  От 500 до 10000 мс. Меньше = чаще обновление.
+                  Текущее: <span class="font-mono">{logPollInterval}мс ({(logPollInterval / 1000).toFixed(1)}с)</span>
+                </p>
+                <div class="mt-4 mb-8 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onclick={saveLogsPollInterval}
+                    disabled={logPollSaving}
+                    class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded hover:bg-neutral-50 dark:hover:bg-neutral-700 transition text-sm text-neutral-900 dark:text-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save size={16} />
+                    {logPollSaving ? 'Сохранение...' : 'Сохранить'}
+                  </button>
+                  {#if logPollMessage}
+                    <span class="text-xs {logPollMessage.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">
+                      {logPollMessage.text}
+                    </span>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          {/if}
 
             <div class="space-y-6">
               {#each Object.entries(selected.prompts) as [name, text]}

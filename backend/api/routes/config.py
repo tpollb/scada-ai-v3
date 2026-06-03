@@ -312,3 +312,60 @@ async def resolve_city(city: str):
     except Exception as e:
         log.error("Geocoding failed", error=str(e), city=city)
         return {"error": f"Ошибка геокодинга: {str(e)}"}
+
+
+class ModuleToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.put("/modules/{module_name}/enabled")
+async def toggle_module(module_name: str, req: ModuleToggleRequest):
+    """Включает/выключает модуль через обновление ENABLED_MODULES в .env"""
+    env = _parse_env()
+    
+    # Парсим текущий список модулей
+    current_modules_str = env.get("ENABLED_MODULES", "hello,health")
+    current_modules = [m.strip() for m in current_modules_str.split(",") if m.strip()]
+    
+    # Проверяем что модуль существует
+    modules_dir = Path(__file__).parent.parent.parent / "modules"
+    available_modules = [
+        p.name for p in modules_dir.iterdir() 
+        if p.is_dir() and not p.name.startswith("_")
+    ]
+    
+    if module_name not in available_modules:
+        return {"status": "error", "message": f"Модуль '{module_name}' не найден"}
+    
+    # Обновляем список
+    if req.enabled:
+        if module_name not in current_modules:
+            current_modules.append(module_name)
+            action = "включён"
+        else:
+            return {"status": "ok", "message": f"Модуль '{module_name}' уже включён", "restart_required": False}
+    else:
+        if module_name in current_modules:
+            # Защита: не даём выключить последний модуль
+            if len(current_modules) <= 1:
+                return {
+                    "status": "error",
+                    "message": "Нельзя отключить последний модуль. Система должна иметь хотя бы один активный модуль."
+                }
+            current_modules.remove(module_name)
+            action = "выключен"
+        else:
+            return {"status": "ok", "message": f"Модуль '{module_name}' уже выключен", "restart_required": False}
+    
+    # Записываем обратно в .env
+    new_modules_str = ",".join(current_modules)
+    _write_env({"ENABLED_MODULES": new_modules_str})
+    
+    log.info("Module toggled", module=module_name, enabled=req.enabled, new_list=current_modules)
+    
+    return {
+        "status": "ok",
+        "message": f"Модуль '{module_name}' {action}. Перезапустите backend для применения изменений.",
+        "restart_required": True,
+        "enabled_modules": current_modules
+    }

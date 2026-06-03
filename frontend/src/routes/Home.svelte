@@ -5,10 +5,11 @@
   import { navigate } from '../stores/ui'
   import { theme } from '../stores/theme'
   import Input from '../components/Input.svelte'
+  import SystemLogsPanel from '../components/SystemLogsPanel.svelte'
   import NarrativePanel from '../components/NarrativePanel.svelte'
   import WidgetRouter from '../components/WidgetRouter.svelte'
   import api from '../lib/api'
-  import { Settings, Volume2, Database, Cpu, Zap, Clock, CheckCircle, XCircle, AlertCircle, Sun, Moon } from 'lucide-svelte'
+  import { Settings, Volume2, Database, Cpu, Zap, Clock, CheckCircle, XCircle, AlertCircle, Sun, Moon, Terminal } from 'lucide-svelte'
 
   interface SystemInfo {
     app_name: string
@@ -30,6 +31,7 @@
   let currentWidgets = $state<any[]>([])
   let lastVoiceText = $state<string | null>(null)
   let systemInfo = $state<SystemInfo | null>(null)
+  let showLogsPanel = $state(false)
 
   onMount(async () => {
     try { health = await getHealth() } catch (e) { console.error('Failed to fetch health:', e) }
@@ -38,6 +40,11 @@
 
   async function handleSend(message: string) {
     const lower = message.toLowerCase()
+    if (lower.includes('логи') || lower.includes('log')) {
+      showLogsPanel = true
+      return
+    }
+    
     if (lower.includes('конфигуратор') || lower.includes('настройки') || lower.includes('настроить')) {
       navigate('config')
       return
@@ -114,6 +121,8 @@
     const caps: any[] = []
     if (systemInfo?.modules?.includes('health')) {
       caps.push({ text: 'покажи здоровье здания', category: 'Анализ' })
+      caps.push({ text: 'проанализируй системный лог', category: 'Анализ' })
+      caps.push({ text: 'покажи логи', category: 'Система', action: 'logs' })
     }
     if (systemInfo?.modules?.includes('schedules')) {
       caps.push({ text: 'расписания', category: 'Планирование' })
@@ -127,7 +136,7 @@
   <header class="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors">
     <div class="flex items-center gap-3">
       <h1 class="text-base font-mono text-neutral-500 dark:text-neutral-400 tracking-tight">
-        SCADA.AI <span class="text-neutral-400 dark:text-neutral-500">v3.0.0</span>
+        SCADA.AI <span class="text-neutral-400 dark:text-neutral-500">v3.0.1</span>
       </h1>
     </div>
     <div class="flex items-center gap-2">
@@ -136,6 +145,14 @@
           <Volume2 size={18} />
         </button>
       {/if}
+      <button 
+        type="button" 
+        onclick={() => showLogsPanel = !showLogsPanel} 
+        class="p-2 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 transition text-neutral-700 dark:text-neutral-300" 
+        title={showLogsPanel ? 'Скрыть логи' : 'Показать логи'}
+      >
+        <Terminal size={18} />
+      </button>
       <button 
         type="button" 
         onclick={() => theme.toggle()} 
@@ -159,6 +176,9 @@
   </header>
 
   <div class="flex-1 flex overflow-hidden">
+    {#if showLogsPanel}
+      <SystemLogsPanel onClose={() => showLogsPanel = false} />
+    {/if}
     <div class="flex-1 flex flex-col bg-white dark:bg-neutral-900 overflow-hidden transition-colors">
       <div class="flex-1 overflow-y-auto">
         <NarrativePanel />

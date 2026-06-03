@@ -82,15 +82,55 @@ class YandexLLMProvider(LLMProvider):
         }
         if tools:
             payload["tools"] = self._build_tools(tools)
+            log.debug("Sending tools to YandexGPT", tools_count=len(tools), tools=payload["tools"])
 
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Api-Key {self.api_key}",
         }
 
+        log.debug("YandexGPT request", payload_keys=list(payload.keys()), messages_count=len(messages))
         resp = await self._client.post(self.API_URL, headers=headers, json=payload)
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        
+        # Полное логирование ответа
+        result = data.get("result", {})
+        alternatives = result.get("alternatives", [])
+        log.info("YandexGPT FULL RESPONSE", 
+                 usage=result.get("usage"),
+                 model_version=result.get("modelVersion"),
+                 alternatives_count=len(alternatives))
+        
+        for i, alt in enumerate(alternatives):
+            msg = alt.get("message", {})
+            log.info(f"YandexGPT alternative #{i}",
+                     status=alt.get("status"),
+                     finish_reason=alt.get("finishReason"),  # Ключевое поле!
+                     message_keys=list(msg.keys()),
+                     text_length=len(msg.get("text", "")),
+                     text_preview=msg.get("text", "")[:300],
+                     has_function_call=bool(msg.get("functionCall")),
+                     function_call=msg.get("functionCall"),
+                     has_tool_calls=bool(msg.get("toolCalls")))
+        
+        # Логируем warning только если это ФИНАЛЬНЫЙ ответ, но он пустой
+        # При ALTERNATIVE_STATUS_TOOL_CALLS текст и не нужен — есть toolCallList
+        if alternatives:
+            status = alternatives[0].get("status", "")
+            msg = alternatives[0].get("message", {})
+            has_text = bool(msg.get("text"))
+            has_tool_call_list = bool(msg.get("toolCallList"))
+            is_tool_call = status == "ALTERNATIVE_STATUS_TOOL_CALLS"
+            
+            # Warning только если финальный ответ пустой
+            if not is_tool_call and not has_text and not has_tool_call_list:
+                import json
+                log.warning("YandexGPT returned empty final response!", 
+                           status=status,
+                           full_response=json.dumps(data, ensure_ascii=False, indent=2)[:2000])
+        
+        return data
 
     async def generate(self, system: str, user: str, *, max_tokens=None, temperature=None) -> str:
         messages = self._build_messages(system, user)
@@ -118,7 +158,11 @@ class YandexLLMProvider(LLMProvider):
         if tool_executor is None:
             raise ValueError("tool_executor обязателен")
 
-        history = [{"role": "user", "text": user}]
+        # Включаем system message в историю — YandexGPT требует его для tool calling
+        history = [
+            {"role": "system", "text": system},
+            {"role": "user", "text": user}
+        ]
         iterations = 0
         all_tool_calls: list[ToolCall] = []
         final_text = ""
@@ -162,10 +206,37 @@ class YandexLLMProvider(LLMProvider):
 
             msg = alternatives[0].get("message", {})
             text = msg.get("text", "")
+            status = alternatives[0].get("status", "")
+            
+            # Поддержка ДВУХ форматов tool calling:
+            # 1. Старый: message.functionCall (yandexgpt-lite, старые модели)
+            # 2. Новый: message.toolCallList.toolCalls[] (yagpt-5.1+, новые модели)
             function_call = msg.get("functionCall")
-
+            
             if not function_call:
+                tool_call_list = msg.get("toolCallList", {})
+                tool_calls = tool_call_list.get("toolCalls", [])
+                if tool_calls:
+                    # Берём первый tool call (обычно один)
+                    first_tool_call = tool_calls[0]
+                    function_call = first_tool_call.get("functionCall")
+            
+            has_tool_call = function_call is not None or status == "ALTERNATIVE_STATUS_TOOL_CALLS"
+            log.debug("LLM response message", 
+                      has_text=bool(text), 
+                      has_function_call=bool(function_call),
+                      status=status,
+                      has_tool_call_list=bool(msg.get("toolCallList")))
+            
+            if not has_tool_call:
+                log.info("LLM returned final text", text_length=len(text), text_preview=text[:200] if text else "")
                 final_text = text
+                break
+            
+            if not function_call:
+                log.warning("ALTERNATIVE_STATUS_TOOL_CALLS but no functionCall found!", 
+                           message_keys=list(msg.keys()))
+                final_text = text or "Не удалось вызвать инструмент."
                 break
 
             tool_name = function_call.get("name", "")
@@ -179,18 +250,47 @@ class YandexLLMProvider(LLMProvider):
             result = await tool_executor.execute(tool_name, tool_args)
             result_content = json.dumps(result, ensure_ascii=False, default=str)
 
-            history.append({
-                "role": "assistant",
-                "text": text,
-                "functionCall": function_call,
-            })
-            history.append({
-                "role": "function",
-                "functionResponse": {
-                    "name": tool_name,
-                    "content": result_content,
-                },
-            })
+            # Формируем историю согласно документации YandexGPT:
+            # https://aistudio.yandex.ru/docs/en/ai-studio/operations/generation/function-call.html
+            #
+            # Правильная последовательность:
+            # 1. assistant с toolCallList (что запросила модель)
+            # 2. user с toolResultList (наш ответ от tool) — ОБЯЗАТЕЛЬНО role="user"!
+            #
+            # Правильная структура toolResult:
+            # - functionResult (не functionResponse!)
+            # - content = просто строка (не объект с contentType!)
+            
+            if msg.get("toolCallList"):
+                history.append({
+                    "role": "assistant",
+                    "toolCallList": msg["toolCallList"],
+                })
+                history.append({
+                    "role": "user",  # ВАЖНО: "user", не "assistant"!
+                    "toolResultList": {
+                        "toolResults": [{
+                            "functionResult": {  # ВАЖНО: "functionResult", не "functionResponse"!
+                                "name": tool_name,
+                                "content": result_content,  # Просто строка, не объект!
+                            }
+                        }]
+                    },
+                })
+            else:
+                # СТАРЫЙ формат: assistant с functionCall, function с functionResponse
+                history.append({
+                    "role": "assistant",
+                    "text": text,
+                    "functionCall": function_call,
+                })
+                history.append({
+                    "role": "function",
+                    "functionResponse": {
+                        "name": tool_name,
+                        "content": result_content,
+                    },
+                })
 
         return {
             "text": final_text,
