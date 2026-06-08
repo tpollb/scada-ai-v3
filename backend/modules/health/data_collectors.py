@@ -10,6 +10,7 @@ log = get_logger()
 
 
 def _priority_label(priority: int | None) -> str:
+    """Возвращает машинный ключ приоритета. Локализация — на фронте."""
     if priority is None:
         return "unknown"
     if priority >= 150: return "high"

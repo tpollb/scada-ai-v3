@@ -28,9 +28,9 @@
   let selectedAlarm = $state<Alarm | null>(null)
 
   const priorityConfig: Record<string, { label: string; color: string; bg: string }> = {
-    high: { label: 'HIGH', color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
-    medium: { label: 'MEDIUM', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
-    low: { label: 'LOW', color: 'text-neutral-700', bg: 'bg-neutral-50 border-neutral-200' },
+    high: { label: 'Высокий', color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
+    medium: { label: 'Средний', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+    low: { label: 'Низкий', color: 'text-neutral-700', bg: 'bg-neutral-50 border-neutral-200' },
   }
 
   async function openDetail(priorityFilter: string = 'all') {
@@ -135,7 +135,7 @@
                 {issue.count} раз
               </span>
               <span class="text-xs px-2 py-0.5 rounded font-medium flex-shrink-0 {priorityConfig[issue.priority]?.bg || ''} {priorityConfig[issue.priority]?.color || ''}">
-                {issue.priority}
+                {priorityConfig[issue.priority]?.label || issue.priority}
               </span>
             </div>
           {/each}

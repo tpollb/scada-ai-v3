@@ -37,6 +37,17 @@
     { key: 'voc', label: 'VOC', unit: 'мг/м³', norm: '< 0.3' },
   ]
 
+  const STATUS_RU: Record<string, string> = {
+    'OK': 'Норма',
+    'WARNING': 'Внимание',
+    'CRITICAL': 'Критично',
+    'NO_DATA': 'Нет данных',
+  }
+
+  function statusRu(status: string): string {
+    return STATUS_RU[status] || status
+  }
+
   function statusColor(status: string): string {
     if (status === 'CRITICAL') return 'text-red-600 bg-red-50 border-red-200'
     if (status === 'WARNING') return 'text-amber-600 bg-amber-50 border-amber-200'
@@ -112,7 +123,7 @@
         >
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-semibold uppercase tracking-wide">{p.label}</span>
-            <span class="text-xs px-2 py-0.5 rounded font-medium">{d.status || 'OK'}</span>
+            <span class="text-xs px-2 py-0.5 rounded font-medium">{statusRu(d.status || 'OK')}</span>
           </div>
           <div class="text-3xl font-bold mb-1 tabular-nums">
             {d.avg ?? '—'}<span class="text-lg font-normal ml-1">{p.unit}</span>

@@ -2,13 +2,14 @@
   import { Info } from 'lucide-svelte'
   
   interface Props {
-    data: { score: number; status: string; sub_scores?: any }
+    data: { score: number; status: string; status_ru?: string; sub_scores?: any }
   }
   let { data }: Props = $props()
   let showFormula = $state(false)
   
   let score = $derived(data?.score ?? 0)
   let status = $derived(data?.status ?? 'UNKNOWN')
+  let statusDisplay = $derived(data?.status_ru || status)
   let subScores = $derived(data?.sub_scores ?? {})
   let color = $derived(score < 30 ? '#dc2626' : score < 60 ? '#d97706' : score < 85 ? '#2563eb' : '#16a34a')
   let circumference = 2 * Math.PI * 80
@@ -66,7 +67,7 @@
     </div>
     <div class="text-center mb-4">
       <span class="inline-block px-4 py-1.5 text-xs font-semibold uppercase rounded" style="background: {color}; color: white">
-        {status}
+        {statusDisplay}
       </span>
     </div>
     
@@ -128,10 +129,10 @@
       <div class="text-xs text-neutral-500 dark:text-neutral-400">
         <div class="font-semibold text-neutral-700 dark:text-neutral-300 mb-2">Шкала статуса:</div>
         <div class="grid grid-cols-2 gap-1.5">
-          <div><span class="inline-block w-2 h-2 rounded-full bg-red-600 mr-1.5"></span>&lt;30: CRITICAL</div>
-          <div><span class="inline-block w-2 h-2 rounded-full bg-amber-600 mr-1.5"></span>30-59: WARNING</div>
-          <div><span class="inline-block w-2 h-2 rounded-full bg-blue-600 mr-1.5"></span>60-84: GOOD</div>
-          <div><span class="inline-block w-2 h-2 rounded-full bg-green-600 mr-1.5"></span>≥85: EXCELLENT</div>
+          <div><span class="inline-block w-2 h-2 rounded-full bg-red-600 mr-1.5"></span>&lt;30: Критично</div>
+          <div><span class="inline-block w-2 h-2 rounded-full bg-amber-600 mr-1.5"></span>30-59: Внимание</div>
+          <div><span class="inline-block w-2 h-2 rounded-full bg-blue-600 mr-1.5"></span>60-84: Хорошо</div>
+          <div><span class="inline-block w-2 h-2 rounded-full bg-green-600 mr-1.5"></span>≥85: Отлично</div>
         </div>
       </div>
     </div>

@@ -1,6 +1,10 @@
 """Рендеринг отчёта — гарантированное добавление life_support + компактные виджеты"""
 from modules.health.data_collectors import PARAM_GROUPS
 from .analysis import HealthReport
+from .localization import (
+    STATUS_RU, SEVERITY_RU, PRIORITY_RU, PARAM_LABELS_RU,
+    translate_status, translate_severity, translate_priority
+)
 from structlog import get_logger
 
 log = get_logger()
@@ -13,10 +17,13 @@ def _safe_int(value, default=0) -> int:
 
 
 def render_voice(report: HealthReport) -> dict:
-    status_ru = {
+    # Используем единую локализацию (нижний регистр для естественной речи)
+    status_ru_map = {
         "CRITICAL": "критическое", "WARNING": "требует внимания",
         "GOOD": "нормальное", "EXCELLENT": "отличное",
-    }.get(report.status, "неизвестное")
+        "NO_DATA": "нет данных", "UNKNOWN": "неизвестное",
+    }
+    status_ru = status_ru_map.get(report.status, translate_status(report.status).lower())
 
     parts = [f"Здоровье системы {report.score} из 100, состояние {status_ru}."]
 
@@ -41,11 +48,11 @@ def render_narrative(report: HealthReport) -> dict:
     lines = []
     lines.append("# Отчёт о здоровье системы")
     lines.append("")
-    lines.append(f"**Композитный индекс:** {report.score}/100 ({report.status})")
+    lines.append(f"**Композитный индекс:** {report.score}/100 ({translate_status(report.status)})")
 
     life = report.life_support or {}
     if life.get("score") is not None:
-        lines.append(f"**Индекс жизнеобеспечения:** {life.get('score')}/100 ({life.get('status')})")
+        lines.append(f"**Индекс жизнеобеспечения:** {life.get('score')}/100 ({translate_status(life.get('status', ''))})")
 
     lines.append(f"**Резюме:** {report.summary}")
     lines.append("")
@@ -75,7 +82,7 @@ def render_narrative(report: HealthReport) -> dict:
     if life.get("score") is not None:
         lines.append("## Индекс жизнеобеспечения")
         lines.append("")
-        lines.append(f"**Общая оценка:** {life.get('score')}/100 ({life.get('status')})")
+        lines.append(f"**Общая оценка:** {life.get('score')}/100 ({translate_status(life.get('status', ''))})")
         lines.append("")
         lines.append("| Параметр | Вес | Статус | Оценка |")
         lines.append("|---|---|---|---|")
@@ -118,8 +125,9 @@ def render_narrative(report: HealthReport) -> dict:
         lines.append("## Рекомендации")
         lines.append("")
         for i, issue in enumerate(issues[:10], 1):
-            severity = (issue.get("severity") or "-").upper()
-            lines.append(f"{i}. **[{severity}]** {issue.get('title', '-')}")
+            severity_raw = issue.get("severity") or "-"
+            severity_ru = translate_severity(severity_raw).upper()
+            lines.append(f"{i}. **[{severity_ru}]** {issue.get('title', '-')}")
             if issue.get("recommendation"):
                 lines.append(f"   {issue.get('recommendation')}")
         lines.append("")
@@ -137,6 +145,7 @@ def render_visual(report: HealthReport) -> dict:
             "data": {
                 "score": report.score,
                 "status": report.status,
+                "status_ru": translate_status(report.status),
                 "sub_scores": report.sub_scores,
             },
             "size": "medium",
@@ -152,9 +161,18 @@ def render_visual(report: HealthReport) -> dict:
     
     # Добавляем если есть score ИЛИ есть params (даже с NO_DATA)
     if life_support.get("score") is not None or life_support.get("params"):
+        # Добавляем локализованные поля для frontend
+        localized_life = dict(life_support)
+        localized_life["status_ru"] = translate_status(life_support.get("status", ""))
+        # Локализуем статусы параметров
+        if "params" in localized_life and isinstance(localized_life["params"], dict):
+            for param_key, param_data in localized_life["params"].items():
+                if isinstance(param_data, dict) and "status" in param_data:
+                    param_data["status_ru"] = translate_status(param_data["status"])
+                    param_data["label_ru"] = PARAM_LABELS_RU.get(param_key, param_key)
         widgets.append({
             "type": "life_support_card",
-            "data": life_support,
+            "data": localized_life,
             "size": "medium",
         })
         log.info("life_support_card added to widgets")
@@ -168,7 +186,13 @@ def render_visual(report: HealthReport) -> dict:
 
     alarms = report.alarms or {}
     if alarms:
-        widgets.append({"type": "alarms_panel", "data": alarms, "size": "wide"})
+        # Локализуем by_priority для frontend
+        localized_alarms = dict(alarms)
+        by_priority = alarms.get("by_priority", {}) or {}
+        localized_alarms["by_priority_ru"] = {
+            translate_priority(k): v for k, v in by_priority.items()
+        }
+        widgets.append({"type": "alarms_panel", "data": localized_alarms, "size": "wide"})
 
     energy = report.energy or {}
     if energy:
