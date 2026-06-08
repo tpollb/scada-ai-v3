@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { navigate } from '../stores/ui'
-  import { ArrowLeft, RefreshCw, Save, AlertCircle, CheckCircle, Server, Database, Key, Sun, Moon } from 'lucide-svelte'
+  import { ArrowLeft, RefreshCw, Save, AlertCircle, CheckCircle, Server, Database, Key, Sun, Moon, FileText } from 'lucide-svelte'
   import { theme } from '../stores/theme'
   import api from '../lib/api'
+  import DocsViewer from '../components/DocsViewer.svelte'
 
   interface ModuleInfo {
     name: string
@@ -34,7 +35,7 @@
     longitude: number
   }
 
-  let activeTab = $state<'modules' | 'system'>('modules')
+  let activeTab = $state<'modules' | 'system' | 'docs'>('modules')
   let modules = $state<ModuleInfo[]>([])
   let envConfig = $state<EnvConfig | null>(null)
   let loading = $state(true)
@@ -259,6 +260,14 @@
       >
         Система
       </button>
+      <button
+        type="button"
+        onclick={() => activeTab = 'docs'}
+        class="px-4 py-1.5 text-sm font-medium rounded transition flex items-center gap-2 {activeTab === 'docs' ? 'bg-white shadow-sm text-neutral-900' : 'text-neutral-600 hover:text-neutral-900'}"
+      >
+        <FileText size={14} />
+        Документация
+      </button>
     </div>
   </header>
 
@@ -419,6 +428,10 @@
           </div>
         {/if}
       </main>
+    </div>
+  {:else if activeTab === 'docs'}
+    <div class="flex-1 overflow-hidden">
+      <DocsViewer />
     </div>
   {:else if activeTab === 'system'}
     <div class="flex-1 overflow-y-auto p-6">

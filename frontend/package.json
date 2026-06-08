@@ -24,6 +24,7 @@
     "cmdk-sv": "^0.0.19",
     "ky": "^2.0.2",
     "lucide-svelte": "^1.0.1",
+    "marked": "^18.0.5",
     "svelte-routing": "^2.13.0"
   }
 }
