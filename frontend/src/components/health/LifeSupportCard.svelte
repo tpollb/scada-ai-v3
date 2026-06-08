@@ -39,9 +39,10 @@
   const paramOrder = ['co2', 'temperature', 'voc', 'humidity', 'pressure']
   
   function paramStatusColor(s: string): string {
-    if (s === 'CRITICAL') return '#dc2626'
-    if (s === 'WARNING') return '#d97706'
-    if (s === 'OK') return '#16a34a'
+    // Поддерживаем и английские и русские статусы
+    if (s === 'CRITICAL' || s === 'Критично') return '#dc2626'
+    if (s === 'WARNING' || s === 'Внимание') return '#d97706'
+    if (s === 'OK' || s === 'Норма') return '#16a34a'
     return '#a3a3a3'
   }
 </script>
@@ -108,9 +109,9 @@
             </tr>
           </thead>
           <tbody>
-            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-green-700 dark:text-green-400 font-medium">OK</td><td class="text-right px-2 py-1.5 font-mono font-semibold">100 баллов</td></tr>
-            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-amber-700 dark:text-amber-400 font-medium">WARNING</td><td class="text-right px-2 py-1.5 font-mono font-semibold">55 баллов</td></tr>
-            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-red-700 dark:text-red-400 font-medium">CRITICAL</td><td class="text-right px-2 py-1.5 font-mono font-semibold">15 баллов</td></tr>
+            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-green-700 dark:text-green-400 font-medium">Норма</td><td class="text-right px-2 py-1.5 font-mono font-semibold">100 баллов</td></tr>
+            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-amber-700 dark:text-amber-400 font-medium">Внимание</td><td class="text-right px-2 py-1.5 font-mono font-semibold">55 баллов</td></tr>
+            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-red-700 dark:text-red-400 font-medium">Критично</td><td class="text-right px-2 py-1.5 font-mono font-semibold">15 баллов</td></tr>
           </tbody>
         </table>
       </div>

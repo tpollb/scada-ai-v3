@@ -115,13 +115,13 @@
             </tr>
           </thead>
           <tbody>
-            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Авария High (крит.)</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">-15 (макс -50)</td></tr>
-            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Авария Medium</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">-4 (макс -25)</td></tr>
-            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Авария Low</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">-0.5 (макс -10)</td></tr>
+            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Авария высокого приоритета (крит.)</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">-15 (макс -50)</td></tr>
+            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Авария среднего приоритета</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">-4 (макс -25)</td></tr>
+            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Авария низкого приоритета</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">-0.5 (макс -10)</td></tr>
             <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Битый датчик</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">до -40</td></tr>
             <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Офлайн тег</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">до -30</td></tr>
-            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">CRITICAL параметр</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">score=15</td></tr>
-            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">WARNING параметр</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">score=55</td></tr>
+            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Критичный параметр</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">score=15</td></tr>
+            <tr class="border-t border-neutral-100 dark:border-neutral-700"><td class="px-2 py-1.5 text-neutral-700 dark:text-neutral-300">Параметр с отклонением</td><td class="text-right px-2 py-1.5 font-mono text-red-700 dark:text-red-400 font-semibold">score=55</td></tr>
           </tbody>
         </table>
       </div>

@@ -56,6 +56,7 @@ async def system_info():
         "app_version": settings.app_version,
         "modules": list(registry._modules.keys()),
         "tools_count": len(executor._tools),
+        "tools_names": list(executor._tools.keys()),
         "db_host": settings.db_host,
         "db_status": db_status,
         "llm_model": settings.yandex_gpt_model,

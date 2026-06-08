@@ -261,10 +261,19 @@
             <div class="flex items-center justify-between mt-2">
               <div class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
                 <Zap size={14} />
-                <span>Tools</span>
+                <span>Инструменты</span>
               </div>
-              <span class="text-xs font-mono text-neutral-500 dark:text-neutral-400">{health?.tools ?? systemInfo.tools_count ?? 0} шт</span>
+              <span class="text-xs font-mono text-neutral-500 dark:text-neutral-400">{systemInfo.tools_names?.length ?? systemInfo.tools_count ?? 0} шт</span>
             </div>
+            {#if systemInfo.tools_names && systemInfo.tools_names.length > 0}
+              <div class="flex flex-wrap gap-1 pl-6 mt-1">
+                {#each systemInfo.tools_names as tool}
+                  <span class="px-2 py-0.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded text-xs font-mono text-neutral-700 dark:text-neutral-300">
+                    {tool}
+                  </span>
+                {/each}
+              </div>
+            {/if}
             
             {#if systemInfo.last_health_check?.timestamp}
               <div class="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
