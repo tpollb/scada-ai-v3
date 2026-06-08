@@ -127,58 +127,134 @@
 
 <style>
   @reference "../app.css";
+  
+  /* Базовый цвет текста */
   :global(.prose) {
-    @apply text-neutral-900 dark:text-neutral-100;
+    color: var(--color-neutral-900);
+    line-height: 1.75;
   }
-  :global(.prose h1) {
-    @apply text-3xl font-bold mb-6 pb-2 border-b border-neutral-200 dark:border-neutral-700;
+  :global(.dark .prose) {
+    color: var(--color-neutral-100);
   }
-  :global(.prose h2) {
-    @apply text-2xl font-semibold mt-8 mb-4 pb-2 border-b border-neutral-200 dark:border-neutral-700;
+
+  /* Заголовки */
+  :global(.prose h1, .prose h2, .prose h3, .prose h4) {
+    color: var(--color-neutral-900);
+    font-weight: 700;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
   }
-  :global(.prose h3) {
-    @apply text-xl font-semibold mt-6 mb-3;
+  :global(.dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4) {
+    color: var(--color-neutral-100);
   }
-  :global(.prose h4) {
-    @apply text-lg font-semibold mt-4 mb-2;
+  :global(.prose h1) { font-size: 1.875rem; border-bottom: 1px solid var(--color-neutral-200); padding-bottom: 0.5rem; }
+  :global(.prose h2) { font-size: 1.5rem; border-bottom: 1px solid var(--color-neutral-200); padding-bottom: 0.5rem; }
+  :global(.dark .prose h1, .dark .prose h2) { border-color: var(--color-neutral-700); }
+
+  /* Параграфы, списки, ячейки */
+  :global(.prose p, .prose li, .prose td, .prose th) {
+    color: var(--color-neutral-800);
+    margin-bottom: 0.75rem;
   }
-  :global(.prose p) {
-    @apply mb-4 leading-relaxed;
+  :global(.dark .prose p, .dark .prose li, .dark .prose td, .dark .prose th) {
+    color: var(--color-neutral-200);
   }
-  :global(.prose ul), :global(.prose ol) {
-    @apply mb-4 pl-6;
-  }
-  :global(.prose li) {
-    @apply mb-2;
-  }
+
+  /* Код */
   :global(.prose code) {
-    @apply px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded text-sm font-mono;
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-900);
+    padding: 0.2em 0.4em;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
+  :global(.dark .prose code) {
+    background: var(--color-neutral-800);
+    color: var(--color-neutral-100);
+  }
+
+  /* Блоки кода */
   :global(.prose pre) {
-    @apply p-4 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded overflow-x-auto mb-4;
+    background: var(--color-neutral-100);
+    border: 1px solid var(--color-neutral-200);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+  }
+  :global(.dark .prose pre) {
+    background: var(--color-neutral-800);
+    border-color: var(--color-neutral-700);
   }
   :global(.prose pre code) {
-    @apply px-0 py-0 bg-transparent border-0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    border: none;
   }
+
+  /* Ссылки */
   :global(.prose a) {
-    @apply text-blue-600 dark:text-blue-400 hover:underline;
+    color: var(--color-blue-600);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
-  :global(.prose blockquote) {
-    @apply pl-4 border-l-4 border-neutral-300 dark:border-neutral-600 italic text-neutral-700 dark:text-neutral-300 mb-4;
+  :global(.dark .prose a) {
+    color: var(--color-blue-400);
   }
+
+  /* Таблицы */
   :global(.prose table) {
-    @apply w-full mb-4 border-collapse;
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+  }
+  :global(.prose th, .prose td) {
+    border: 1px solid var(--color-neutral-300);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+  }
+  :global(.dark .prose th, .dark .prose td) {
+    border-color: var(--color-neutral-700);
   }
   :global(.prose th) {
-    @apply text-left font-semibold px-3 py-2 border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800;
+    background: var(--color-neutral-100);
+    font-weight: 600;
   }
-  :global(.prose td) {
-    @apply px-3 py-2 border border-neutral-200 dark:border-neutral-700;
+  :global(.dark .prose th) {
+    background: var(--color-neutral-800);
   }
+
+  /* Разделители */
   :global(.prose hr) {
-    @apply my-8 border-neutral-200 dark:border-neutral-700;
+    border: none;
+    border-top: 1px solid var(--color-neutral-300);
+    margin: 2rem 0;
   }
+  :global(.dark .prose hr) {
+    border-color: var(--color-neutral-700);
+  }
+
+  /* Цитаты */
+  :global(.prose blockquote) {
+    border-left: 4px solid var(--color-neutral-300);
+    padding-left: 1rem;
+    font-style: italic;
+    color: var(--color-neutral-700);
+    margin: 1rem 0;
+  }
+  :global(.dark .prose blockquote) {
+    border-color: var(--color-neutral-600);
+    color: var(--color-neutral-300);
+  }
+
+  /* Жирный текст */
   :global(.prose strong) {
-    @apply font-semibold;
+    font-weight: 600;
+    color: var(--color-neutral-900);
+  }
+  :global(.dark .prose strong) {
+    color: var(--color-neutral-100);
   }
 </style>
