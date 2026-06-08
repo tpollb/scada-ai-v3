@@ -243,7 +243,7 @@
     </button>
     <div class="flex items-center gap-3 flex-1">
       <h1 class="text-xl font-semibold text-neutral-900">Конфигуратор</h1>
-      <span class="text-sm text-neutral-500">v3.0.1</span>
+      <span class="text-sm text-neutral-500">v3.0.2</span>
     </div>
     <div class="flex gap-1 bg-neutral-100 rounded p-1">
       <button

@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.0.2] - 2026-06-08
+
+### Added
+- **Backend:** Встроенная документация системы (docs/)
+  - README.md, MODULES.md, API.md, CHAT_EXAMPLES.md, ARCHITECTURE.md, CHANGELOG.md
+  - REST API для доступа к документации (GET /docs/list, GET /docs/{filename})
+- **Frontend:** DocsViewer компонент в конфигураторе
+  - Sidebar со списком файлов + markdown рендеринг через marked
+  - Вкладка "Документация" в Config.svelte
+
+### Changed
+- Версия приложения: 3.0.1 → 3.0.2
+
+---
+
+
 Все значимые изменения в проекте документируются в этом файле.
 
 Формат основан на [Keep a Changelog](https://keepachangelog.com/).
