@@ -5,28 +5,24 @@
 ## Health API
 
 ### GET /health/ping
-
 Простой health-check.
 
 **Response:**
-```json
+```
 {
   "status": "ok",
   "time": "2026-01-15T10:30:00"
 }
 ```
 
----
-
 ### GET /health/metrics-summary
-
 Сводка по параметрам среды с агрегацией по зонам.
 
 **Query Parameters:**
 - `period_hours` (int, default=24) — период анализа
 
 **Response:**
-```json
+```
 {
   "params": {
     "temperature": {
@@ -39,8 +35,8 @@
       "tags_count": 150,
       "outliers_count": 2,
       "by_zone": {
-        "Зона 1": {"avg": 22.0, "count": 50},
-        "Зона 2": {"avg": 23.0, "count": 100}
+        "Зона 1": { "avg": 22.0, "count": 50 },
+        "Зона 2": { "avg": 23.0, "count": 100 }
       }
     }
   },
@@ -50,10 +46,7 @@
 
 **Использование:** Frontend для environmental_panel виджета.
 
----
-
 ### GET /health/alarms
-
 Журнал аварий с фильтрами.
 
 **Query Parameters:**
@@ -62,7 +55,7 @@
 - `limit` (int, default=200, min=1, max=1000)
 
 **Response:**
-```json
+```
 {
   "period_hours": 24,
   "filter": "all",
@@ -91,10 +84,7 @@
 
 **Использование:** Frontend для alarms_panel виджета.
 
----
-
 ### GET /health/environmental/{param}
-
 Детальный drilldown по параметру среды.
 
 **Path Parameters:**
@@ -105,40 +95,37 @@
 - `limit` (int, default=5000, min=100, max=20000)
 
 **Response:**
-```json
+```
 {
   "param": "temperature",
   "label": "Температура",
   "unit": "°C",
-  "norms": {"opt_min": 18, "opt_max": 24},
-  "validator": {"min": -50, "max": 80},
+  "norms": { "opt_min": 18, "opt_max": 24 },
+  "validator": { "min": -50, "max": 80 },
   "count": 5000,
   "outliers_count": 3,
   "history": [
-    {"tag_id": 1, "tag_name": "temp_1", "value": 22.5, "timestamp": "..."}
+    { "tag_id": 1, "tag_name": "temp_1", "value": 22.5, "timestamp": "..." }
   ],
   "hourly": [
-    {"hour": "2026-01-15T10", "avg": 22.0, "min": 20.0, "max": 24.0}
+    { "hour": "2026-01-15T10", "avg": 22.0, "min": 20.0, "max": 24.0 }
   ],
   "tags_last_values": [
-    {"tag_id": 1, "tag_name": "temp_1", "last_value": 22.5, "is_valid": true}
+    { "tag_id": 1, "tag_name": "temp_1", "last_value": 22.5, "is_valid": true }
   ],
   "outliers": [
-    {"tag_id": 2, "tag_name": "temp_2", "value": -999, "threshold": "-50..80 °C"}
+    { "tag_id": 2, "tag_name": "temp_2", "value": -999, "threshold": "-50..80 °C" }
   ]
 }
 ```
 
 **Использование:** Frontend модалка drilldown в environmental_panel.
 
----
-
 ### GET /health/debug
-
 Список всех доступных endpoints health API.
 
 **Response:**
-```json
+```
 {
   "endpoints": [
     "GET /health/ping",
@@ -151,16 +138,13 @@
 }
 ```
 
----
-
 ## Chat API
 
 ### POST /chat
-
 Основной endpoint для диалога с AI.
 
 **Request:**
-```json
+```
 {
   "message": "покажи здоровье здания",
   "session_id": "default"
@@ -168,7 +152,7 @@
 ```
 
 **Response:**
-```json
+```
 {
   "response": "# Отчёт о здоровье системы\n\n**Композитный индекс:** 65/100...",
   "status": "ok",
@@ -181,7 +165,7 @@
     "widgets": [
       {
         "type": "health_score",
-        "data": {"score": 65, "status": "GOOD", "status_ru": "Хорошо"},
+        "data": { "score": 65, "status": "GOOD", "status_ru": "Хорошо" },
         "size": "medium"
       }
     ]
@@ -196,22 +180,19 @@
 3. Для health: собирает данные → LLM → рендерит виджеты
 4. Frontend показывает narrative + виджеты + озвучивает voice
 
----
-
 ## System API
 
 ### GET /system/info
-
 Информация о системе (для сайдбара).
 
 **Response:**
-```json
+```
 {
   "app_name": "SCADA.AI",
-  "app_version": "3.0.1",
-  "modules": ["hello", "health", "logs"],
-  "tools_count": 2,
-  "tools_names": ["analyze_logs", "get_health_report"],
+  "app_version": "3.1.0",
+  "modules": ["hello", "health", "logs", "energy_electricity", "energy_water", "energy_heat"],
+  "tools_count": 8,
+  "tools_names": ["analyze_logs", "get_health_report", "calculate_electricity_cost", "get_electricity_consumption", "calculate_water_cost", "get_water_consumption", "calculate_heat_cost", "get_heat_consumption"],
   "db_host": "localhost",
   "db_status": "ok",
   "llm_model": "yandexgpt-5.1/latest",
@@ -226,16 +207,13 @@
 }
 ```
 
----
-
 ## Config API
 
 ### GET /config/modules
-
 Список модулей с их статусом.
 
 **Response:**
-```json
+```
 [
   {
     "name": "health",
@@ -243,26 +221,23 @@
     "description": "Анализ здоровья системы",
     "enabled": true,
     "status": "loaded",
-    "prompts": {"HEALTH_SYSTEM_PROMPT": "..."}
+    "prompts": { "HEALTH_SYSTEM_PROMPT": "..." }
   }
 ]
 ```
 
----
-
 ### PUT /config/modules/{module_name}/enabled
-
 Включить/выключить модуль.
 
 **Request:**
-```json
+```
 {
   "enabled": true
 }
 ```
 
 **Response:**
-```json
+```
 {
   "status": "ok",
   "message": "Модуль 'health' включён. Перезапустите backend.",
@@ -270,14 +245,11 @@
 }
 ```
 
----
-
 ### GET /config/env
-
 Читает системную конфигурацию из `.env`.
 
 **Response:**
-```json
+```
 {
   "db_host": "localhost",
   "db_port": 5432,
@@ -290,14 +262,11 @@
 }
 ```
 
----
-
 ### GET /config/resolve-city?city=Нижний Тагил
-
 Определяет координаты и timezone по названию города (через Nominatim/OpenStreetMap).
 
 **Response:**
-```json
+```
 {
   "city": "Нижний Тагил",
   "latitude": 57.9167,
@@ -306,37 +275,122 @@
 }
 ```
 
----
+## Energy API
+
+### GET /energy/tariffs
+Спис тарифов по всем ресурсам.
+
+**Response:**
+```
+{
+  "electricity": [
+    {
+      "id": "t1",
+      "start_date": "2025-01-01",
+      "end_date": "2026-02-01",
+      "price_per_unit": 5.50,
+      "currency": "RUB",
+      "note": "Тариф 2025"
+    }
+  ],
+  "water": [],
+  "heat": []
+}
+```
+
+### POST /energy/tariffs
+Создать новый тариф.
+
+**Request:**
+```
+{
+  "resource": "electricity",
+  "start_date": "2026-02-01",
+  "end_date": null,
+  "price_per_unit": 6.20,
+  "currency": "RUB",
+  "note": "Тариф 2026"
+}
+```
+
+### PUT /energy/tariffs/{resource}/{id}
+Обновить существующий тариф.
+
+### DELETE /energy/tariffs/{resource}/{id}
+Удалить тариф.
+
+### GET /energy/config
+Конфигурация счётчиков по ресурсам.
+
+**Response:**
+```
+{
+  "electricity": {
+    "enabled": true,
+    "unit": "кВт·ч",
+    "meters": [
+      {
+        "id": "input_1",
+        "name": "Первый ввод",
+        "tag_current": "LERS.electricity meter current month 1",
+        "tag_last": "LERS.electricity meter last month 1"
+      }
+    ]
+  },
+  "water": { "enabled": false, "unit": "м³", "meters": [] },
+  "heat": { "enabled": false, "unit": "Гкал", "meters": [] }
+}
+```
+
+### PUT /energy/config/{resource}
+Обновить конфигурацию ресурса (включить/выключить, изменить счётчики).
+
+### GET /energy/summary
+Сводка по всем ресурсам: текущий + прошлый месяц + стоимость.
+
+**Response:**
+```
+{
+  "electricity": {
+    "current_month": { "consumption_kwh": 4250, "cost_rub": 26350 },
+    "last_month": { "consumption_kwh": 18388, "cost_rub": 114005.6 },
+    "errors": []
+  },
+  "water": null,
+  "heat": null,
+  "total_cost_current": 26350.0,
+  "total_cost_last": 114005.6,
+  "errors": []
+}
+```
+
+**Использование:** Frontend виджет `energy_cost_card` и вкладка "Энергоучёт" в конфигураторе.
 
 ## Logs API
 
 ### GET /logs/files
-
 Список файлов логов.
 
 **Response:**
-```json
+```
 {
   "count": 5,
   "files": [
-    {"name": "2026-01-15.log", "size": 1024},
-    {"name": "2026-01-14.log", "size": 2048}
+    { "name": "2026-01-15.log", "size": 1024 },
+    { "name": "2026-01-14.log", "size": 2048 }
   ]
 }
 ```
 
----
-
 ### GET /logs/current?limit=100&level=ERROR
-
 Текущие логи из буфера.
 
 **Response:**
-```json
+```
 {
   "count": 100,
   "logs": [
-    {"timestamp": "...", "level": "ERROR", "message": "DB connection failed"}
+    { "timestamp": "...", "level": "ERROR", "message": "DB connection failed" }
   ],
   "source": "current",
   "file": "2026-01-15.log"

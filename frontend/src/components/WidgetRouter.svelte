@@ -1,10 +1,9 @@
 <script lang="ts">
   import HealthScoreCard from './health/HealthScoreCard.svelte'
-  import StatsCards from './health/StatsCards.svelte'
+  import EnergyCostCard from './health/EnergyCostCard.svelte'
   import IssuesList from './health/IssuesList.svelte'
   import EnvironmentalPanel from './health/EnvironmentalPanel.svelte'
   import AlarmsPanel from './health/AlarmsPanel.svelte'
-  import EnergyPanel from './health/EnergyPanel.svelte'
   import LifeSupportCard from './health/LifeSupportCard.svelte'
   import { ChevronDown, ChevronUp, X } from 'lucide-svelte'
 
@@ -17,13 +16,12 @@
   let collapsed = $state(false)
 
   const componentMap: Record<string, any> = {
+    'energy_cost_card': EnergyCostCard,
     'health_score': HealthScoreCard,
     'life_support_card': LifeSupportCard,
-    'stats_cards': StatsCards,
     'issues_list': IssuesList,
     'environmental_panel': EnvironmentalPanel,
     'alarms_panel': AlarmsPanel,
-    'energy_panel': EnergyPanel,
   }
 
   function handleClose() {
@@ -53,7 +51,7 @@
     {#if !collapsed}
       <div class="space-y-4 p-4 max-h-[75vh] overflow-y-auto">
         {#if mediumWidgets.length > 0}
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             {#each mediumWidgets as widget}
               {@const Component = componentMap[widget.type]}
               {#if Component}

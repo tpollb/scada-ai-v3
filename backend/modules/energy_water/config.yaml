@@ -1,0 +1,7 @@
+name: energy_water
+version: 1.0.0
+description: Учёт водопотребления (счётчики не подключены)
+enabled: false
+
+unit: m3
+currency: RUB

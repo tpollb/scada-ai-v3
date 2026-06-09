@@ -163,7 +163,7 @@ async def handle_health_query(message: str, provider) -> ChatResponse:
         log.error("LLM call failed", error=str(e))
         # Fallback на детерминированный расчёт
         report = compute_health_report(data)
-        rendered = render_all(report)
+        rendered = await render_all(report)
         return ChatResponse(
             response=rendered["narrative"]["text"],
             status="ok",
@@ -185,6 +185,11 @@ async def handle_health_query(message: str, provider) -> ChatResponse:
                  score=real_life_support.get("score"),
                  status=real_life_support.get("status"))
         
+        # sub_scores вычисляем ДЕТЕРМИНИРОВАННО из реальных данных (не из LLM)
+        from modules.health.analysis import compute_health_report
+        deterministic_report = compute_health_report(data)
+        log.info("Using deterministic sub_scores", sub_scores=deterministic_report.sub_scores)
+
         report = HealthReport(
             score=parsed.get("score", 50),
             status=parsed.get("status", "UNKNOWN"),
@@ -196,7 +201,7 @@ async def handle_health_query(message: str, provider) -> ChatResponse:
             alarms=parsed.get("alarms", alarms),
             energy=parsed.get("energy", {}),
             recommendations=parsed.get("recommendations", []),
-            sub_scores=parsed.get("sub_scores", {}),
+            sub_scores=deterministic_report.sub_scores,
             life_support=real_life_support,  # Всегда из реальных данных!
         )
     else:
@@ -204,7 +209,7 @@ async def handle_health_query(message: str, provider) -> ChatResponse:
         report = compute_health_report(data)
 
     # 5. Рендерим отчёт
-    rendered = render_all(report)
+    rendered = await render_all(report)
 
     # 6. Обновляем системную инфу для сайдбара
     try:

@@ -1,0 +1,7 @@
+name: energy_heat
+version: 1.0.0
+description: Учёт теплопотребления (счётчики не подключены)
+enabled: false
+
+unit: Gcal
+currency: RUB

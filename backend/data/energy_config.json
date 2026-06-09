@@ -1,0 +1,30 @@
+{
+  "electricity": {
+    "enabled": true,
+    "unit": "kWh",
+    "meters": [
+      {
+        "id": "input_1",
+        "name": "Первый ввод",
+        "tag_current": "LERS.electricity meter current month 1",
+        "tag_last": "LERS.electricity meter last month 1"
+      },
+      {
+        "id": "input_2",
+        "name": "Второй ввод",
+        "tag_current": "LERS.electricity meter current month 2",
+        "tag_last": "LERS.electricity meter last month 2"
+      }
+    ]
+  },
+  "water": {
+    "enabled": false,
+    "unit": "m3",
+    "meters": []
+  },
+  "heat": {
+    "enabled": false,
+    "unit": "Gcal",
+    "meters": []
+  }
+}

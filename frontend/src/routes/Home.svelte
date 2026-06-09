@@ -9,7 +9,7 @@
   import NarrativePanel from '../components/NarrativePanel.svelte'
   import WidgetRouter from '../components/WidgetRouter.svelte'
   import api from '../lib/api'
-  import { Settings, Volume2, Database, Cpu, Zap, Clock, CheckCircle, XCircle, AlertCircle, Sun, Moon, Terminal } from 'lucide-svelte'
+  import { Settings, Volume2, Database, Cpu, Zap, Clock, CheckCircle, XCircle, AlertCircle, Sun, Moon, Terminal, Wrench, Package, ChevronDown, ChevronUp } from 'lucide-svelte'
 
   interface SystemInfo {
     app_name: string
@@ -29,6 +29,8 @@
 
   let health = $state<any>(null)
   let currentWidgets = $state<any[]>([])
+  let collapsedModules = $state(false)
+  let collapsedTools = $state(false)
   let lastVoiceText = $state<string | null>(null)
   let systemInfo = $state<SystemInfo | null>(null)
   let showLogsPanel = $state(false)
@@ -243,29 +245,53 @@
               <span class="text-xs font-mono text-neutral-500 dark:text-neutral-400 truncate max-w-40">{systemInfo.scada_url}</span>
             </div>
             
-            <div class="flex items-center justify-between">
+            <button
+              type="button"
+              onclick={() => collapsedModules = !collapsedModules}
+              class="w-full flex items-center justify-between hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded px-1 -mx-1 transition"
+            >
               <div class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
-                <Cpu size={14} />
+                <Package size={14} />
                 <span>Модули</span>
               </div>
-              <span class="text-xs font-mono text-neutral-500 dark:text-neutral-400">{systemInfo.modules.length} шт</span>
-            </div>
-            <div class="flex flex-wrap gap-1 pl-6">
-              {#each systemInfo.modules as mod}
-                <span class="px-2 py-0.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded text-xs font-mono text-neutral-700 dark:text-neutral-300">
-                  {mod}
-                </span>
-              {/each}
-            </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono text-neutral-500 dark:text-neutral-400">{systemInfo.modules.length} шт</span>
+                {#if collapsedModules}
+                  <ChevronDown size={14} class="text-neutral-400" />
+                {:else}
+                  <ChevronUp size={14} class="text-neutral-400" />
+                {/if}
+              </div>
+            </button>
+            {#if !collapsedModules}
+              <div class="flex flex-wrap gap-1 pl-6 mt-1">
+                {#each systemInfo.modules as mod}
+                  <span class="px-2 py-0.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded text-xs font-mono text-neutral-700 dark:text-neutral-300">
+                    {mod}
+                  </span>
+                {/each}
+              </div>
+            {/if}
             
-            <div class="flex items-center justify-between mt-2">
+            <button
+              type="button"
+              onclick={() => collapsedTools = !collapsedTools}
+              class="w-full flex items-center justify-between mt-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded px-1 -mx-1 transition"
+            >
               <div class="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
-                <Zap size={14} />
+                <Wrench size={14} />
                 <span>Инструменты</span>
               </div>
-              <span class="text-xs font-mono text-neutral-500 dark:text-neutral-400">{systemInfo.tools_names?.length ?? systemInfo.tools_count ?? 0} шт</span>
-            </div>
-            {#if systemInfo.tools_names && systemInfo.tools_names.length > 0}
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono text-neutral-500 dark:text-neutral-400">{systemInfo.tools_names?.length ?? systemInfo.tools_count ?? 0} шт</span>
+                {#if collapsedTools}
+                  <ChevronDown size={14} class="text-neutral-400" />
+                {:else}
+                  <ChevronUp size={14} class="text-neutral-400" />
+                {/if}
+              </div>
+            </button>
+            {#if !collapsedTools && systemInfo.tools_names && systemInfo.tools_names.length > 0}
               <div class="flex flex-wrap gap-1 pl-6 mt-1">
                 {#each systemInfo.tools_names as tool}
                   <span class="px-2 py-0.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded text-xs font-mono text-neutral-700 dark:text-neutral-300">

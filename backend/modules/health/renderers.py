@@ -1,6 +1,9 @@
 """Рендеринг отчёта — гарантированное добавление life_support + компактные виджеты"""
 from modules.health.data_collectors import PARAM_GROUPS
 from .analysis import HealthReport
+
+# Energy cost async import (внутри render_visual)
+
 from .localization import (
     STATUS_RU, SEVERITY_RU, PRIORITY_RU, PARAM_LABELS_RU,
     translate_status, translate_severity, translate_priority
@@ -135,22 +138,56 @@ def render_narrative(report: HealthReport) -> dict:
     return {"text": "\n".join(lines), "format": "markdown"}
 
 
-def render_visual(report: HealthReport) -> dict:
+async def render_visual(report: HealthReport) -> dict:
     """Виджеты для Workspace — ГАРАНТИРОВАННО life_support + компактный health_score"""
     
+    # === Виджет энергозатрат ===
+    energy_widget_data = None
+    try:
+        from modules.energy_electricity.tools import calculate_electricity_cost
+        energy_raw = await calculate_electricity_cost()
+        
+        # Преобразуем в структуру которую ждёт EnergyCostCard
+        current_cost = energy_raw.get("current_month", {}).get("cost_rub", 0) or 0
+        last_cost = energy_raw.get("last_month", {}).get("cost_rub", 0) or 0
+        
+        energy_widget_data = {
+            "electricity": energy_raw,
+            "water": None,
+            "heat": None,
+            "total_cost_current": float(current_cost),
+            "total_cost_last": float(last_cost),
+            "errors": energy_raw.get("errors", []),
+        }
+        
+        log.info("Energy data fetched for widget",
+                 current_cost=current_cost,
+                 last_cost=last_cost)
+    except Exception as e:
+        log.warning("Failed to get energy data for widget", error=str(e))
+
     # 1. Индекс здоровья (компактный)
-    widgets = [
-        {
-            "type": "health_score",
-            "data": {
-                "score": report.score,
-                "status": report.status,
-                "status_ru": translate_status(report.status),
-                "sub_scores": report.sub_scores,
-            },
+    widgets = []
+
+    # Виджет энергозатрат — в начало списка
+    if energy_widget_data:
+        widgets.append({
+            "type": "energy_cost_card",
+            "data": energy_widget_data,
             "size": "medium",
+        })
+        log.info("energy_cost_card widget added")
+
+    widgets.append({
+        "type": "health_score",
+        "data": {
+            "score": report.score,
+            "status": report.status,
+            "status_ru": translate_status(report.status),
+            "sub_scores": report.sub_scores,
         },
-    ]
+        "size": "medium",
+    })
 
     # 2. Индекс жизнеобеспечения — ВСЕГДА добавляем если есть данные в life_support
     life_support = report.life_support or {}
@@ -194,13 +231,6 @@ def render_visual(report: HealthReport) -> dict:
         }
         widgets.append({"type": "alarms_panel", "data": localized_alarms, "size": "wide"})
 
-    energy = report.energy or {}
-    if energy:
-        widgets.append({"type": "energy_panel", "data": energy, "size": "wide"})
-
-    if report.stats:
-        widgets.append({"type": "stats_cards", "data": report.stats, "size": "wide"})
-
     if report.issues:
         widgets.append({"type": "issues_list", "data": {"issues": report.issues}, "size": "wide"})
 
@@ -211,9 +241,9 @@ def render_visual(report: HealthReport) -> dict:
     return {"widgets": widgets}
 
 
-def render_all(report: HealthReport) -> dict:
+async def render_all(report: HealthReport) -> dict:
     return {
         "voice": render_voice(report),
         "narrative": render_narrative(report),
-        "visual": render_visual(report),
+        "visual": await render_visual(report),
     }

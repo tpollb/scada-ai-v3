@@ -1,0 +1,22 @@
+{
+  "electricity": [
+    {
+      "id": "tariff_001",
+      "start_date": "2025-01-01",
+      "end_date": "2026-02-01",
+      "price_per_unit": 5.5,
+      "currency": "RUB",
+      "note": "Тариф 2025 года"
+    },
+    {
+      "id": "tariff_002",
+      "start_date": "2026-02-01",
+      "end_date": null,
+      "price_per_unit": 6.2,
+      "currency": "RUB",
+      "note": "Текущий тариф 2026"
+    }
+  ],
+  "water": [],
+  "heat": []
+}

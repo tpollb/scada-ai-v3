@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { ChevronDown, ChevronUp } from 'lucide-svelte'
   interface Props {
     data: { issues: any[] }
   }
   let { data }: Props = $props()
+
+  let collapsed = $state(true)
 
   let issues = $derived(data?.issues ?? [])
 
@@ -15,13 +18,25 @@
 </script>
 
 <div class="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded transition-colors">
-  <div class="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
-    <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+  <button
+    type="button"
+    onclick={() => collapsed = !collapsed}
+    class="w-full px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-700 transition"
+  >
+    <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 text-left">
       Обнаруженные проблемы
     </h3>
-    <span class="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">{issues.length}</span>
-  </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">{issues.length}</span>
+      {#if collapsed}
+        <ChevronDown size={16} class="text-neutral-400" />
+      {:else}
+        <ChevronUp size={16} class="text-neutral-400" />
+      {/if}
+    </div>
+  </button>
 
+  {#if !collapsed}
   {#if issues.length === 0}
     <div class="p-8 text-center text-neutral-500 dark:text-neutral-400 text-sm">
       Проблем не обнаружено
@@ -51,4 +66,6 @@
       {/each}
     </div>
   {/if}
+  {/if}
+
 </div>

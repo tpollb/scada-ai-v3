@@ -3,11 +3,11 @@
 ## Общая схема
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Frontend (Svelte 5)                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ Home.svelte  │  │ Config.svelte│  │ SystemLogsPanel  │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
+┌──────────────────────────────────────────────────────────────┐
+│                        Frontend (Svelte 5)                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐    │
+│  │ Home.svelte  │  │ Config.svelte│  │ SystemLogsPanel  │    │
+│  └──────────────┘  └──────────────┘  └──────────────────┘    │
 │           │                  │                    │          │
 │           └──────────────────┴────────────────────┘          │
 │                              │                               │
@@ -17,36 +17,36 @@
 └──────────────────────────────┼───────────────────────────────┘
                                │
                                ▼
-┌─────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────┐
 │                      Backend (FastAPI)                       │
 │                                                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │                    API Routers                        │   │
-│  │  /chat  /health  /system  /config  /logs              │   │
-│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │                    API Routers                       │    │
+│  │  /chat  /health  /system  /config  /logs             │    │
+│  └──────────────────────────────────────────────────────┘    │
 │           │                                                  │
 │           ▼                                                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              Module Registry (auto-discovery)         │   │
-│  │  modules/health  modules/hello  modules/logs          │   │
-│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │              Module Registry (auto-discovery)        │    │
+│  │  modules/health  modules/hello  modules/logs         │    │
+│  └──────────────────────────────────────────────────────┘    │
 │           │                                                  │
 │           ▼                                                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              Tool Executor (dispatch)                 │   │
-│  │  analyze_logs()  get_health_report()                  │   │
-│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │              Tool Executor (dispatch)                │    │
+│  │  analyze_logs()  get_health_report()                 │    │
+│  └──────────────────────────────────────────────────────┘    │
 │           │                                                  │
 │           ▼                                                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              LLM Provider (YandexGPT)                 │   │
-│  │  generate()  generate_with_tools()                    │   │
-│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐    │
+│  │              LLM Provider (YandexGPT)                │    │
+│  │  generate()  generate_with_tools()                   │    │
+│  └──────────────────────────────────────────────────────┘    │
 └──────────────────────────────┼───────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   PostgreSQL (SCADA DB)                      │
+│                   PostgreSQL (SCADA DB)                     │
 │  tags_value  alarm_events_history  tags_dict  zones_dict    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -75,6 +75,15 @@ backend/
 │       ├── yandex.py            # YandexGPT implementation
 │       └── factory.py           # get_provider()
 ├── modules/
+│   ├── energy_electricity/
+│   │   ├── __init__.py
+│   │   ├── config.yaml
+│   │   ├── tools.py             # calculate_electricity_cost, get_electricity_consumption
+│   │   └── prompts.py
+│   ├── energy_water/
+│   │   └── ...                  # аналогично electricity
+│   ├── energy_heat/
+│   │   └── ...                  # аналогично electricity
 │   ├── health/
 │   │   ├── __init__.py
 │   │   ├── config.yaml
@@ -89,6 +98,9 @@ backend/
 │   └── logs/
 │       ├── tools.py             # analyze_logs()
 │       └── prompts.py
+├── data/
+│   ├── tariffs.json             # Интервальные тарифы (electricity/water/heat)
+│   └── energy_config.json       # Конфигурация счётчиков
 └── config/
     └── settings.py              # Pydantic settings
 ```
@@ -114,7 +126,8 @@ frontend/
 │   │       ├── LifeSupportCard.svelte
 │   │       ├── EnvironmentalPanel.svelte
 │   │       ├── AlarmsPanel.svelte
-│   │       └── EnergyPanel.svelte
+│   │       ├── EnergyCostCard.svelte
+│   │       └── IssuesList.svelte
 │   ├── stores/
 │   │   ├── chat.ts              # messages, isLoading
 │   │   ├── theme.ts             # dark/light mode
@@ -189,7 +202,7 @@ frontend/
 ## Module Registry
 
 **Автообнаружение:**
-```python
+```
 # core/module_registry.py
 def discover_modules() -> list[str]:
     for path in modules_dir.iterdir():
@@ -198,7 +211,7 @@ def discover_modules() -> list[str]:
 ```
 
 **Загрузка модуля:**
-```python
+```
 def load_module(name: str):
     # 1. Читаем config.yaml
     config = yaml.safe_load(path / "config.yaml")
@@ -222,152 +235,156 @@ def load_module(name: str):
 ### Health модуль
 
 **Детерминированный слой** (analysis.py):
-```python
+```
 def compute_health_report(data: dict) -> HealthReport:
     # Формулы без LLM
     alarm_idx = _compute_alarm_index(by_priority)
     env_idx = _compute_environmental_index(env)
+    equip_idx = _compute_equipment_index(equip)
     # ...
-    score = 0.35 * alarm_idx + 0.30 * env_idx + ...
+    score = 0.40 * alarm_idx + 0.35 * env_idx + 0.25 * equip_idx
     return HealthReport(score=score, ...)
 ```
 
 **LLM слой** (prompts.py):
-```python
+```
 HEALTH_SYSTEM_PROMPT = ```
 Ты — инженер-аналитик SCADA-системы.
 Верни JSON в формате: {score, status, summary, ...}
 ```
+Когда что используется:
+Виджеты → детерминированный (быстро, бесплатно)
+Narrative в чате → LLM (медленно, но с анализом)
+Logs модуль
+Только LLM:
 ```
-
-**Когда что используется:**
-- Виджеты → детерминированный (быстро, бесплатно)
-- Narrative в чате → LLM (медленно, но с анализом)
-
----
-
-### Logs модуль
-
-**Только LLM:**
-```python
-# logs/tools.py
+logs/tools.py
 async def analyze_logs(limit: int = 100) -> dict:
-    logs = system_logger.get_logs(limit=limit)
-    return {"logs": logs}
+logs = system_logger.get_logs(limit=limit)
+return {"logs": logs}
 ```
-
 LLM получает логи через tool и сама анализирует.
-
----
-
-## Конфигурация
-
-### .env файл
-
-```bash
-# Database
+Модули энергоучёта
+Архитектура
+```
+User: "сколько денег потратили на электричество?"
+↓
+chat.py → LLM.generate_with_tools()
+↓
+LLM: "Вызову calculate_electricity_cost"
+↓
+tool_executor → energy_electricity/tools.py
+↓
+Читаем energy_config.json (теги счётчиков)
+SQL-запросы к ЛЭРС (current/last month)
+Читаем tariffs.json
+Выбираем действующий тариф по дате
+Считаем стоимость: потребление × тариф
+↓
+Response: { current_month: {cost: 26350}, last_month: {cost: 114005} }
+```
+Интервальные тарифы
+```
+{
+"electricity": [
+{
+"id": "t1",
+"start_date": "2025-01-01",
+"end_date": "2026-02-01",
+"price_per_unit": 5.50,
+"currency": "RUB"
+},
+{
+"id": "t2",
+"start_date": "2026-02-01",
+"end_date": null,
+"price_per_unit": 6.20,
+"currency": "RUB"
+}
+]
+}
+```
+Логика выбора тарифа:
+```
+def get_active_tariff(resource: str, date: datetime) -> float:
+for tariff in tariffs[resource]:
+if tariff.start_date <= date and (tariff.end_date is None or date < tariff.end_date):
+return tariff.price_per_unit
+return DEFAULT_TARIFF
+```
+Конфигурация
+.env файл
+```
+Database
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=scada
 DB_USER=postgres
 DB_PASSWORD=secret
-
-# SCADA
+SCADA
 SCADA_BASE_URL=http://localhost:9002
-
-# YandexGPT
+YandexGPT
 YANDEX_API_KEY=y0_...
 YANDEX_FOLDER_ID=b1g...
 YANDEX_GPT_MODEL=yandexgpt-5.1/latest
-
-# LLM settings
+LLM settings
 LLM_TEMPERATURE=0.05
 LLM_MAX_TOKENS=32000
 LLM_TIMEOUT=30
-
-# Location
+Location
 CITY=Москва
 TIMEZONE=Europe/Moscow
 LATITUDE=55.7558
 LONGITUDE=37.6173
-
-# Modules
-ENABLED_MODULES=hello,health,logs
-
-# Logging
+Modules
+ENABLED_MODULES=hello,health,logs,energy_electricity,energy_water,energy_heat
+Logging
 LOG_POLL_INTERVAL_MS=2000
 ```
-
----
-
-## Безопасность
-
-### Текущее состояние
-
-- **Нет авторизации** — все endpoints публичные
-- **Нет CORS** — только localhost
-- **API ключи** в `.env` (не коммитятся)
-
-### Рекомендации для продакшена
-
-1. Добавить JWT авторизацию
-2. Настроить CORS (разрешить только frontend домен)
-3. Использовать HTTPS
-4. Rate limiting на /chat
-5. Валидация входных данных (Pydantic models)
-
----
-
-## Масштабирование
-
-### Текущие ограничения
-
-- **Single instance** — один backend процесс
-- **In-memory module registry** — не распределённый
-- **PostgreSQL** — single master
-
-### Для продакшена
-
-1. **Docker Compose** — backend + frontend + postgres
-2. **Redis** — кэширование health-отчётов
-3. **Celery** — фоновые задачи (scheduled analysis)
-4. **Prometheus** — метрики
-5. **Grafana** — дашборды
-
----
-
-## Отладка
-
-### Логи
-
-```bash
-# Backend логи
+Безопасность
+Текущее состояние
+Нет авторизации — все endpoints публичные
+Нет CORS — только localhost
+API ключи в .env (не коммитятся)
+Рекомендации для продакшена
+Добавить JWT авторизацию
+Настроить CORS (разрешить только frontend домен)
+Использовать HTTPS
+Rate limiting на /chat
+Валидация входных данных (Pydantic models)
+Масштабирование
+Текущие ограничения
+Single instance — один backend процесс
+In-memory module registry — не распределённый
+PostgreSQL — single master
+Для продакшена
+Docker Compose — backend + frontend + postgres
+Redis — кэширование health-отчётов
+Celery — фоновые задачи (scheduled analysis)
+Prometheus — метрики
+Grafana — дашборды
+Отладка
+Логи
+```
+Backend логи
 tail -f backend/logs/2026-01-15.log
-
-# Frontend консоль
+Frontend консоль
 F12 → Console
 ```
-
-### Debug endpoints
-
-```bash
-# Список всех endpoints
+Debug endpoints
+```
+Список всех endpoints
 curl http://localhost:8081/api/v1/health/debug
-
-# Проверка БД
+Проверка БД
 curl http://localhost:8081/api/v1/system/info | jq .db_status
 ```
-
-### Common issues
-
-**"LLM не настроен":**
-- Проверь YANDEX_API_KEY в .env
-- Убедись что ключ активен
-
-**"Модуль не загружен":**
-- Проверь ENABLED_MODULES в .env
-- Перезапусти backend
-
-**"DB connection failed":**
-- Проверь DB_HOST, DB_PORT, DB_PASSWORD
-- Убедись что PostgreSQL запущен
+Common issues
+"LLM не настроен":
+Проверь YANDEX_API_KEY в .env
+Убедись что ключ активен
+"Модуль не загружен":
+Проверь ENABLED_MODULES в .env
+Перезапусти backend
+"DB connection failed":
+Проверь DB_HOST, DB_PORT, DB_PASSWORD
+Убедись что PostgreSQL запущен

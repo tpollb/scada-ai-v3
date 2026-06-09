@@ -388,10 +388,9 @@ def compute_health_report(data: dict) -> HealthReport:
         energy=energy_block,
         recommendations=[],
         sub_scores={
-            "alarms": {"score": alarm_idx, "weight": 35},
-            "environmental": {"score": env_idx, "weight": 30},
+            "alarms": {"score": alarm_idx, "weight": 40},
+            "environmental": {"score": env_idx, "weight": 35},
             "equipment": {"score": equip_idx, "weight": 25},
-            "energy": {"score": energy_idx, "weight": 10},
         },
         life_support=life_support,
     )

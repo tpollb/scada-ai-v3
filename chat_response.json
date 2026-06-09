@@ -1,0 +1,234 @@
+{
+  "response": "# Отчёт о здоровье системы\n\n**Композитный индекс:** 55/100 (Внимание)\n**Индекс жизнеобеспечения:** 83/100 (Хорошо)\n**Резюме:** В системе выявлены критические проблемы с качеством воздуха (VOC), а также значительное количество битых датчиков и активных аварий. Энергоэффективность находится на уровне WARNING из-за избыточного использования искусственного освещения в дневное время.\n\n## Формула расчёта композитного индекса\n\nИндекс = взвешенная сумма четырёх под-индексов:\n\n| Под-индекс | Вес | Значение | Вклад |\n|---|---|---|---|\n| Аварии | 25% | 75/100 | +18 |\n| Среда | 25% | 75/100 | +18 |\n| Оборудование | 25% | 75/100 | +18 |\n| Энергия | 25% | 75/100 | +18 |\n| **Итого** | **100%** | — | **72/100** |\n\n## Индекс жизнеобеспечения\n\n**Общая оценка:** 83/100 (Хорошо)\n\n| Параметр | Вес | Статус | Оценка |\n|---|---|---|---|\n| CO2 | 30% | OK | 100/100 |\n| Температура | 25% | OK | 100/100 |\n| VOC | 20% | CRITICAL | 15/100 |\n| Влажность | 15% | OK | 100/100 |\n| Давление | 10% | OK | 100/100 |\n\n## Параметры жизнедеятельности (детально)\n\n**Температура** [OK]\n- Среднее: 22.31 °C\n- Мин/Макс: 6.91 / 29.12 °C\n- Норма: 18-24 °C\n\n**Влажность** [OK]\n- Среднее: 56.69 %\n- Мин/Макс: 7.78 / 100.0 %\n- Норма: 30-60 %\n\n**CO2** [OK]\n- Среднее: 528.69 ppm\n- Мин/Макс: 408.0 / 1413.0 ppm\n- Норма: 400-800 ppm\n\n**Давление** [OK]\n- Среднее: 740.72 мм рт. ст.\n- Мин/Макс: 733.0 / 764.0 мм рт. ст.\n- Норма: 720-780 мм рт. ст.\n\n**VOC (качество воздуха)** [!!!]\n- Среднее: 6.71 мг/м³\n- Мин/Макс: 0.5 / 49.98 мг/м³\n- Норма: 0-0.3 мг/м³\n\n## Рекомендации\n\n1. **[КРИТИЧЕСКИЙ]** Критическое качество воздуха (VOC)\n   Провести проверку и очистку системы вентиляции, выявить источники повышенного уровня VOC\n2. **[ВЫСОКИЙ]** Битые датчики CO2 и VOC\n   Заменить неисправные датчики\n3. **[СРЕДНИЙ]** Избыточное использование искусственного освещения\n   Оптимизировать использование естественного освещения\n",
+  "status": "ok",
+  "voice": {
+    "text": "Здоровье системы 55 из 100, состояние требует внимания. Жизнеобеспечение 83 из 100. Аварий высокого приоритета: 102.",
+    "priority": "alert",
+    "interrupt": false
+  },
+  "visual": {
+    "widgets": [
+      {
+        "type": "energy_cost_card",
+        "data": {
+          "electricity": {
+            "current_month": {
+              "consumption_kwh": 4250.0,
+              "cost_rub": 26350.0,
+              "tariff_id": "tariff_002",
+              "price_per_kwh": 6.2,
+              "error": null
+            },
+            "last_month": {
+              "consumption_kwh": 18388.0,
+              "cost_rub": 114005.6,
+              "tariff_id": "tariff_002",
+              "price_per_kwh": 6.2,
+              "error": null
+            },
+            "comparison": {
+              "delta_kwh": -14138.0,
+              "delta_cost_rub": -87655.6,
+              "delta_percent": -76.9
+            },
+            "errors": []
+          },
+          "water": null,
+          "heat": null,
+          "total_cost_current": 26350.0,
+          "total_cost_last": 114005.6,
+          "errors": []
+        },
+        "size": "medium"
+      },
+      {
+        "type": "health_score",
+        "data": {
+          "score": 55,
+          "status": "WARNING",
+          "status_ru": "Внимание",
+          "sub_scores": {}
+        },
+        "size": "medium"
+      },
+      {
+        "type": "life_support_card",
+        "data": {
+          "score": 83,
+          "status": "GOOD",
+          "params": {
+            "co2": {
+              "status": "OK",
+              "score": 100,
+              "avg": 528.69,
+              "unit": "ppm",
+              "weight": 30,
+              "status_ru": "OK",
+              "label_ru": "CO2"
+            },
+            "temperature": {
+              "status": "OK",
+              "score": 100,
+              "avg": 22.31,
+              "unit": "°C",
+              "weight": 25,
+              "status_ru": "OK",
+              "label_ru": "Температура"
+            },
+            "voc": {
+              "status": "CRITICAL",
+              "score": 15,
+              "avg": 6.71,
+              "unit": "мг/м³",
+              "weight": 20,
+              "status_ru": "Критично",
+              "label_ru": "VOC"
+            },
+            "humidity": {
+              "status": "OK",
+              "score": 100,
+              "avg": 56.69,
+              "unit": "%",
+              "weight": 15,
+              "status_ru": "OK",
+              "label_ru": "Влажность"
+            },
+            "pressure": {
+              "status": "OK",
+              "score": 100,
+              "avg": 740.72,
+              "unit": "мм рт. ст.",
+              "weight": 10,
+              "status_ru": "OK",
+              "label_ru": "Давление"
+            }
+          },
+          "problems": [
+            "Критическое отклонение: voc"
+          ],
+          "status_ru": "Хорошо"
+        },
+        "size": "medium"
+      },
+      {
+        "type": "environmental_panel",
+        "data": {
+          "temperature": {
+            "avg": 22.31,
+            "min": 6.91,
+            "max": 29.12,
+            "status": "OK",
+            "deviations_count": 4854,
+            "outliers_count": 0
+          },
+          "humidity": {
+            "avg": 56.69,
+            "min": 7.78,
+            "max": 100.0,
+            "status": "OK",
+            "deviations_count": 947,
+            "outliers_count": 109
+          },
+          "co2": {
+            "avg": 528.69,
+            "min": 408.0,
+            "max": 1413.0,
+            "status": "OK",
+            "deviations_count": 256,
+            "outliers_count": 260
+          },
+          "pressure": {
+            "avg": 740.72,
+            "min": 733.0,
+            "max": 764.0,
+            "status": "OK",
+            "deviations_count": 0,
+            "outliers_count": 416
+          },
+          "voc": {
+            "avg": 6.71,
+            "min": 0.5,
+            "max": 49.98,
+            "status": "CRITICAL",
+            "deviations_count": 8626,
+            "outliers_count": 1374
+          }
+        },
+        "size": "wide"
+      },
+      {
+        "type": "alarms_panel",
+        "data": {
+          "total": 216,
+          "active": 216,
+          "by_priority": {
+            "high": 102,
+            "medium": 54,
+            "low": 60
+          },
+          "top_issues": [
+            {
+              "name": "R214-Humidity-1",
+              "count": 38,
+              "priority": "high"
+            },
+            {
+              "name": "R214-Humidity-1",
+              "count": 37,
+              "priority": "medium"
+            },
+            {
+              "name": "R214-CO2-1",
+              "count": 11,
+              "priority": "high"
+            },
+            {
+              "name": "R214-VOC-1",
+              "count": 11,
+              "priority": "high"
+            }
+          ],
+          "by_priority_ru": {
+            "Высокий": 102,
+            "Средний": 54,
+            "Низкий": 60
+          }
+        },
+        "size": "wide"
+      },
+      {
+        "type": "issues_list",
+        "data": {
+          "issues": [
+            {
+              "severity": "critical",
+              "category": "environmental",
+              "title": "Критическое качество воздуха (VOC)",
+              "details": "Среднее значение VOC составляет 6.71 мг/м³, что значительно превышает норму.",
+              "recommendation": "Провести проверку и очистку системы вентиляции, выявить источники повышенного уровня VOC"
+            },
+            {
+              "severity": "major",
+              "category": "equipment",
+              "title": "Битые датчики CO2 и VOC",
+              "details": "Обнаружено 260 битых датчиков CO2 и 1374 битых датчиков VOC.",
+              "recommendation": "Заменить неисправные датчики"
+            },
+            {
+              "severity": "warning",
+              "category": "energy",
+              "title": "Избыточное использование искусственного освещения",
+              "details": "В дневное время включено 72.6% светильников.",
+              "recommendation": "Оптимизировать использование естественного освещения"
+            }
+          ]
+        },
+        "size": "wide"
+      }
+    ]
+  },
+  "tool_calls": [
+    "collect_all_health_data",
+    "llm_analyze"
+  ]
+}

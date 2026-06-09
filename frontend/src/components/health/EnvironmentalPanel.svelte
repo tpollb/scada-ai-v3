@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-svelte'
+  import { ChevronRight, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-svelte'
   import api from '../../lib/api'
 
   interface Props {
@@ -22,6 +22,7 @@
     error?: string
   }
 
+  let collapsed = $state(true)
   let selectedParam = $state<string | null>(null)
   let detail = $state<EnvDetail | null>(null)
   let loading = $state(false)
@@ -104,12 +105,24 @@
 </script>
 
 <div class="bg-white border border-neutral-200 rounded">
-  <div class="px-4 py-3 border-b border-neutral-200">
-    <h3 class="text-sm font-semibold text-neutral-900 uppercase tracking-wide">
+  <button
+    type="button"
+    onclick={() => collapsed = !collapsed}
+    class="w-full px-4 py-3 border-b border-neutral-200 flex items-center justify-between hover:bg-neutral-50 transition"
+  >
+    <h3 class="text-sm font-semibold text-neutral-900 uppercase tracking-wide text-left">
       Параметры жизнедеятельности
     </h3>
-  </div>
+    <div class="flex items-center gap-2">
+      {#if collapsed}
+        <ChevronDown size={16} class="text-neutral-400" />
+      {:else}
+        <ChevronUp size={16} class="text-neutral-400" />
+      {/if}
+    </div>
+  </button>
 
+  {#if !collapsed}
   <div class="p-4 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
     {#each paramConfigs as p}
       {@const d = data?.[p.key]}
@@ -158,6 +171,7 @@
       {/if}
     {/each}
   </div>
+  {/if}
 </div>
 
 <!-- Модалка drilldown -->

@@ -28,6 +28,36 @@
   let circumference = 2 * Math.PI * 80
   let offset = $derived(circumference - (score / 100) * circumference)
   
+  // Формируем строку детализации: "CO2 30 + Температура 25 + VOC 3 + Влажность 15 + Давление 10"
+  function breakdown(): string {
+    const weights: Record<string, number> = {
+      co2: 30,
+      temperature: 25,
+      voc: 20,
+      humidity: 15,
+      pressure: 10,
+    }
+    const labels: Record<string, string> = {
+      co2: 'CO2',
+      temperature: 'Темп',
+      voc: 'VOC',
+      humidity: 'Влажн',
+      pressure: 'Давл',
+    }
+    const parts: string[] = []
+    for (const key of ['co2', 'temperature', 'voc', 'humidity', 'pressure']) {
+      const p = params[key]
+      if (p) {
+        const s = p.score ?? 0
+        const w = weights[key] ?? 0
+        const contrib = Math.round(s * w / 100)
+        parts.push(`${labels[key]} ${contrib}`)
+      }
+    }
+    return parts.length > 0 ? parts.join(' + ') : ''
+  }
+
+  
   const paramLabels: Record<string, { label: string; unit: string; weight: number }> = {
     co2: { label: 'CO2', unit: 'ppm', weight: 30 },
     temperature: { label: 'Температура', unit: '°C', weight: 25 },
@@ -80,13 +110,16 @@
         <div class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">из 100</div>
       </div>
     </div>
-    <div class="text-center mb-4">
+    <div class="text-center mb-2">
       <span class="inline-block px-4 py-1.5 text-xs font-semibold uppercase rounded" style="background: {color}; color: white">
         {statusDisplay}
       </span>
     </div>
-
-
+    {#if breakdown() && !showFormula}
+      <div class="text-center mb-4 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono tabular-nums px-2">
+        {score} = {breakdown()}
+      </div>
+    {/if}
   {:else}
     <div class="text-sm text-neutral-700 dark:text-neutral-300 flex-1 overflow-y-auto">
       <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Формула расчёта</div>

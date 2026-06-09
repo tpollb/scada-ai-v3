@@ -1,0 +1,13 @@
+name: energy_electricity
+version: 1.0.0
+description: Расчёт стоимости электроэнергии на основе тегов ЛЭРС
+enabled: true
+
+# Единицы измерения
+unit: kWh
+currency: RUB
+
+# Периоды анализа
+default_periods:
+  current_month: true
+  last_month: true

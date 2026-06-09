@@ -1,35 +1,42 @@
 <script lang="ts">
   import { Info } from 'lucide-svelte'
-  
+
   interface Props {
     data: { score: number; status: string; status_ru?: string; sub_scores?: any }
   }
   let { data }: Props = $props()
   let showFormula = $state(false)
-  
+
   let score = $derived(data?.score ?? 0)
   let status = $derived(data?.status ?? 'UNKNOWN')
   let statusDisplay = $derived(data?.status_ru || status)
-  let subScores = $derived(data?.sub_scores ?? {})
   let color = $derived(score < 30 ? '#dc2626' : score < 60 ? '#d97706' : score < 85 ? '#2563eb' : '#16a34a')
   let circumference = 2 * Math.PI * 80
   let offset = $derived(circumference - (score / 100) * circumference)
+
+  let subScores = $derived(data?.sub_scores ?? {})
   
-  const subLabels: Record<string, string> = {
-    alarms: 'Аварии',
-    environmental: 'Среда',
-    equipment: 'Оборудование',
-    energy: 'Энергия',
+  // Формируем строку детализации: "Аварии (40%) + Среда (35%) + Оборудование (25%)"
+  function breakdown(): string {
+    if (!subScores || Object.keys(subScores).length === 0) return ''
+    
+    const labels: Record<string, string> = {
+      alarms: 'Аварии',
+      environmental: 'Среда',
+      equipment: 'Оборудование',
+    }
+    
+    const parts: string[] = []
+    for (const key of ['alarms', 'environmental', 'equipment']) {
+      const sub = subScores[key]
+      if (sub && typeof sub === 'object') {
+        const w = sub.weight ?? 25
+        parts.push(`${labels[key] || key} (${w}%)`)
+      }
+    }
+    return parts.length > 0 ? parts.join(' + ') : ''
   }
-  
-  const subOrder = ['alarms', 'environmental', 'equipment', 'energy']
-  
-  function subColor(s: number): string {
-    if (s < 30) return '#dc2626'
-    if (s < 60) return '#d97706'
-    if (s < 85) return '#2563eb'
-    return '#16a34a'
-  }
+
 </script>
 
 <div class="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-6 relative h-full flex flex-col transition-colors">
@@ -65,44 +72,21 @@
         <div class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">из 100</div>
       </div>
     </div>
-    <div class="text-center mb-4">
+    <div class="text-center mb-2">
       <span class="inline-block px-4 py-1.5 text-xs font-semibold uppercase rounded" style="background: {color}; color: white">
         {statusDisplay}
       </span>
     </div>
-    
-    {#if Object.keys(subScores).length > 0}
-      <div class="pt-4 border-t border-neutral-200 dark:border-neutral-700">
-        <div class="text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-3">Компоненты</div>
-        <div class="space-y-2.5">
-          {#each subOrder as key}
-            {@const sub = subScores[key]}
-            {#if sub}
-              {@const subScore = sub.score ?? 0}
-              {@const weight = sub.weight ?? 25}
-              <div class="flex items-center gap-2">
-                <div class="w-24 text-xs text-neutral-700 dark:text-neutral-300 font-medium">{subLabels[key] || key}</div>
-                <div class="flex-1 h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
-                  <div
-                    class="h-full transition-all duration-500"
-                    style="width: {subScore}%; background: {subColor(subScore)}"
-                  ></div>
-                </div>
-                <div class="w-10 text-right text-xs font-mono tabular-nums font-semibold" style="color: {subColor(subScore)}">
-                  {subScore}
-                </div>
-                <div class="w-10 text-right text-xs text-neutral-400 dark:text-neutral-500">{weight}%</div>
-              </div>
-            {/if}
-          {/each}
-        </div>
+    {#if breakdown() && !showFormula}
+      <div class="text-center mb-4 text-[11px] text-neutral-400 dark:text-neutral-500 font-mono tabular-nums px-2">
+        {score} = {breakdown()}
       </div>
     {/if}
   {:else}
     <div class="text-sm text-neutral-700 dark:text-neutral-300 flex-1 overflow-y-auto">
       <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Композитная формула</div>
       <div class="p-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded font-mono text-xs mb-4">
-        score = <span class="text-blue-700 dark:text-blue-400 font-semibold">0.35</span>×Аварии + <span class="text-blue-700 dark:text-blue-400 font-semibold">0.30</span>×Среда + <span class="text-blue-700 dark:text-blue-400 font-semibold">0.25</span>×Оборуд + <span class="text-blue-700 dark:text-blue-400 font-semibold">0.10</span>×Энергия
+        score = <span class="text-blue-700 dark:text-blue-400 font-semibold">0.40</span>×Аварии + <span class="text-blue-700 dark:text-blue-400 font-semibold">0.35</span>×Среда + <span class="text-blue-700 dark:text-blue-400 font-semibold">0.25</span>×Оборуд
       </div>
 
       <div class="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Штрафы внутри под-индексов</div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight, X, AlertTriangle } from 'lucide-svelte'
+  import { ChevronRight, ChevronDown, ChevronUp, X, AlertTriangle } from 'lucide-svelte'
   import api from '../../lib/api'
 
   interface Props {
@@ -20,6 +20,7 @@
     zone: string | null
   }
 
+  let collapsed = $state(true)
   let showDetail = $state(false)
   let alarms = $state<Alarm[]>([])
   let loading = $state(false)
@@ -86,14 +87,26 @@
 </script>
 
 <div class="bg-white border border-neutral-200 rounded">
-  <div class="px-4 py-3 border-b border-neutral-200 flex items-center justify-between">
-    <h3 class="text-sm font-semibold text-neutral-900 uppercase tracking-wide">Аварии</h3>
-    <div class="flex items-center gap-3 text-xs">
-      <span class="text-neutral-500">Всего: <span class="font-bold tabular-nums text-neutral-900">{total}</span></span>
-      <span class="text-neutral-500">Активных: <span class="font-bold tabular-nums text-neutral-900">{active}</span></span>
+  <button
+    type="button"
+    onclick={() => collapsed = !collapsed}
+    class="w-full px-4 py-3 border-b border-neutral-200 flex items-center justify-between hover:bg-neutral-50 transition"
+  >
+    <h3 class="text-sm font-semibold text-neutral-900 uppercase tracking-wide text-left">Аварии</h3>
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 text-xs">
+        <span class="text-neutral-500">Всего: <span class="font-bold tabular-nums text-neutral-900">{total}</span></span>
+        <span class="text-neutral-500">Активных: <span class="font-bold tabular-nums text-neutral-900">{active}</span></span>
+      </div>
+      {#if collapsed}
+        <ChevronDown size={16} class="text-neutral-400" />
+      {:else}
+        <ChevronUp size={16} class="text-neutral-400" />
+      {/if}
     </div>
-  </div>
+  </button>
 
+  {#if !collapsed}
   <div class="p-4">
     <div class="grid grid-cols-3 gap-2 mb-4">
       {#each ['high', 'medium', 'low'] as p}
@@ -147,6 +160,7 @@
       </div>
     {/if}
   </div>
+  {/if}
 </div>
 
 <!-- Модалка с журналом аварий -->
