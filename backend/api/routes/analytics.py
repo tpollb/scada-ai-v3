@@ -1,4 +1,4 @@
-"""Analytics API — тренды, корреляции и аналитика"""
+"""Analytics API — тренды, корреляции, топ проблем"""
 from fastapi import APIRouter, Query
 from datetime import datetime
 from structlog import get_logger
@@ -6,6 +6,7 @@ from structlog import get_logger
 from modules.analytics.collectors.history import collect_history
 from modules.analytics.analyzers.trends import analyze_trends
 from modules.analytics.analyzers.correlations import find_correlations
+from modules.analytics.analyzers.aggregators import rank_issues
 
 log = get_logger()
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -23,19 +24,24 @@ async def get_report(
     params: str = Query("all", description="Параметры через запятую или 'all'"),
     aggregation: str = Query("auto", description="Агрегация: raw/hourly/daily/auto"),
     min_correlation: float = Query(0.5, description="Минимальный |r| для корреляций"),
+    top_issues_count: int = Query(5, description="Количество топ проблем"),
 ):
     """
-    Отчёт аналитики: тренды, корреляции, статистика.
+    Отчёт аналитики: тренды, корреляции, топ проблем.
 
     aggregation:
       - raw: все сырые точки (LIMIT 100000) — только для коротких периодов
       - hourly: GROUP BY hour — для 7-90 дней
       - daily: GROUP BY day — для >90 дней
       - auto: автоматически по периоду
-    
+
     min_correlation:
       - Минимальный |коэффициент| для включения в correlations
       - По умолчанию 0.5 (умеренная корреляция)
+    
+    top_issues_count:
+      - Количество топ проблем в ответе
+      - По умолчанию 5
     """
     log.info(
         "analytics/report requested",
@@ -43,6 +49,7 @@ async def get_report(
         params=params,
         aggregation=aggregation,
         min_correlation=min_correlation,
+        top_issues_count=top_issues_count,
     )
 
     # Парсим params
@@ -67,12 +74,20 @@ async def get_report(
         min_correlation=min_correlation,
     )
 
+    # 4. Ранжируем проблемы
+    top_issues = rank_issues(
+        history_data=history,
+        trends_data=trends,
+        top_n=top_issues_count,
+    )
+
     log.info(
         "analytics/report ready",
         period=period,
         aggregation=history["aggregation"],
         params=list(trends["trends"].keys()),
         correlations=len(correlations),
+        top_issues=len(top_issues),
     )
 
     return {
@@ -81,4 +96,5 @@ async def get_report(
         "collected_at": history["collected_at"],
         "trends": trends["trends"],
         "correlations": correlations,
+        "top_issues": top_issues,
     }

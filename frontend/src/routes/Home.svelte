@@ -138,7 +138,7 @@
   <header class="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors">
     <div class="flex items-center gap-3">
       <h1 class="text-base font-mono text-neutral-500 dark:text-neutral-400 tracking-tight">
-        SCADA.AI <span class="text-neutral-400 dark:text-neutral-500">v3.1.2</span>
+        SCADA.AI <span class="text-neutral-400 dark:text-neutral-500">v3.1.3</span>
       </h1>
     </div>
     <div class="flex items-center gap-2">
