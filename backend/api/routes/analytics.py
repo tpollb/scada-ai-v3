@@ -1,4 +1,4 @@
-"""Analytics API — тренды, корреляции, топ проблем"""
+"""Analytics API — тренды, корреляции, топ проблемы + LLM insights"""
 from fastapi import APIRouter, Query
 from datetime import datetime
 from structlog import get_logger
@@ -7,6 +7,7 @@ from modules.analytics.collectors.history import collect_history
 from modules.analytics.analyzers.trends import analyze_trends
 from modules.analytics.analyzers.correlations import find_correlations
 from modules.analytics.analyzers.aggregators import rank_issues
+from modules.analytics.llm.analyzer import get_analytics_llm
 
 log = get_logger()
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -25,23 +26,25 @@ async def get_report(
     aggregation: str = Query("auto", description="Агрегация: raw/hourly/daily/auto"),
     min_correlation: float = Query(0.5, description="Минимальный |r| для корреляций"),
     top_issues_count: int = Query(5, description="Количество топ проблем"),
+    include_llm: bool = Query(True, description="Включить LLM-анализ (insights, рекомендации, прогнозы)"),
 ):
     """
-    Отчёт аналитики: тренды, корреляции, топ проблем.
-
-    aggregation:
-      - raw: все сырые точки (LIMIT 100000) — только для коротких периодов
-      - hourly: GROUP BY hour — для 7-90 дней
-      - daily: GROUP BY day — для >90 дней
-      - auto: автоматически по периоду
-
-    min_correlation:
-      - Минимальный |коэффициент| для включения в correlations
-      - По умолчанию 0.5 (умеренная корреляция)
+    Полный отчёт аналитики: тренды, корреляции, топ проблемы + LLM insights.
     
-    top_issues_count:
-      - Количество топ проблем в ответе
-      - По умолчанию 5
+    Параметры:
+      - period: период в днях (7, 30, 90, 365)
+      - aggregation: raw/hourly/daily/auto
+      - min_correlation: порог для корреляций (default 0.5)
+      - top_issues_count: количество топ проблем (default 5)
+      - include_llm: вызывать ли LLM (default true)
+    
+    При include_llm=true возвращает поля:
+      - summary: краткое резюме
+      - insights: список инсайтов
+      - recommendations: список рекомендаций
+      - forecast: прогноз на 7/30 дней
+    
+    При ошибке LLM возвращается fallback с полем llm_error.
     """
     log.info(
         "analytics/report requested",
@@ -50,6 +53,7 @@ async def get_report(
         aggregation=aggregation,
         min_correlation=min_correlation,
         top_issues_count=top_issues_count,
+        include_llm=include_llm,
     )
 
     # Парсим params
@@ -81,16 +85,8 @@ async def get_report(
         top_n=top_issues_count,
     )
 
-    log.info(
-        "analytics/report ready",
-        period=period,
-        aggregation=history["aggregation"],
-        params=list(trends["trends"].keys()),
-        correlations=len(correlations),
-        top_issues=len(top_issues),
-    )
-
-    return {
+    # Базовый ответ
+    response = {
         "period_days": period,
         "aggregation": history["aggregation"],
         "collected_at": history["collected_at"],
@@ -98,3 +94,36 @@ async def get_report(
         "correlations": correlations,
         "top_issues": top_issues,
     }
+
+    # 5. LLM insights (если включено)
+    if include_llm:
+        try:
+            llm = get_analytics_llm()
+            llm_result = await llm.analyze(
+                trends=trends["trends"],
+                correlations=correlations,
+                top_issues=top_issues,
+                period_days=period,
+            )
+            response["summary"] = llm_result.get("summary", "")
+            response["insights"] = llm_result.get("insights", [])
+            response["recommendations"] = llm_result.get("recommendations", [])
+            response["forecast"] = llm_result.get("forecast", {})
+            if "llm_error" in llm_result:
+                response["llm_error"] = llm_result["llm_error"]
+                log.warning("LLM used fallback", error=llm_result["llm_error"])
+        except Exception as e:
+            log.error("LLM analysis failed", error=str(e))
+            response["llm_error"] = str(e)
+
+    log.info(
+        "analytics/report ready",
+        period=period,
+        aggregation=history["aggregation"],
+        params=list(trends["trends"].keys()),
+        correlations=len(correlations),
+        top_issues=len(top_issues),
+        has_llm="summary" in response,
+    )
+
+    return response
