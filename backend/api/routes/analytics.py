@@ -1,10 +1,11 @@
-"""Analytics API — тренды и аналитика"""
+"""Analytics API — тренды, корреляции и аналитика"""
 from fastapi import APIRouter, Query
 from datetime import datetime
 from structlog import get_logger
 
 from modules.analytics.collectors.history import collect_history
 from modules.analytics.analyzers.trends import analyze_trends
+from modules.analytics.analyzers.correlations import find_correlations
 
 log = get_logger()
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -21,21 +22,27 @@ async def get_report(
     period: int = Query(30, description="Период в днях (7, 30, 90, 365)"),
     params: str = Query("all", description="Параметры через запятую или 'all'"),
     aggregation: str = Query("auto", description="Агрегация: raw/hourly/daily/auto"),
+    min_correlation: float = Query(0.5, description="Минимальный |r| для корреляций"),
 ):
     """
-    Отчёт аналитики: тренды, аномалии, статистика.
+    Отчёт аналитики: тренды, корреляции, статистика.
 
     aggregation:
       - raw: все сырые точки (LIMIT 100000) — только для коротких периодов
       - hourly: GROUP BY hour — для 7-90 дней
       - daily: GROUP BY day — для >90 дней
       - auto: автоматически по периоду
+    
+    min_correlation:
+      - Минимальный |коэффициент| для включения в correlations
+      - По умолчанию 0.5 (умеренная корреляция)
     """
     log.info(
         "analytics/report requested",
         period=period,
         params=params,
         aggregation=aggregation,
+        min_correlation=min_correlation,
     )
 
     # Парсим params
@@ -54,11 +61,18 @@ async def get_report(
     # 2. Анализируем тренды
     trends = analyze_trends(history)
 
+    # 3. Находим корреляции
+    correlations = find_correlations(
+        history,
+        min_correlation=min_correlation,
+    )
+
     log.info(
         "analytics/report ready",
         period=period,
         aggregation=history["aggregation"],
         params=list(trends["trends"].keys()),
+        correlations=len(correlations),
     )
 
     return {
@@ -66,4 +80,5 @@ async def get_report(
         "aggregation": history["aggregation"],
         "collected_at": history["collected_at"],
         "trends": trends["trends"],
+        "correlations": correlations,
     }
