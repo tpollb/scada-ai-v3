@@ -1,0 +1,19 @@
+name: analytics
+version: 1.0.0
+description: Аналитика, тренды, корреляции и рекомендации
+enabled: true
+
+# Горизонты анализа по умолчанию
+default_periods:
+  days: 30
+
+# Доступные периоды для UI
+available_periods: [7, 30, 90, 365]
+
+# Параметры для анализа (те же что в health)
+params:
+  - temperature
+  - humidity
+  - co2
+  - pressure
+  - voc

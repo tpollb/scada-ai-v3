@@ -138,7 +138,7 @@ async def debug_routes():
 # ============================================================================
 # Подключаем роутеры
 # ============================================================================
-from api.routes import chat, config, health, system, docs, energy  # noqa: E402
+from api.routes import chat, config, health, system, docs, energy, analytics  # noqa: E402
 
 app.include_router(chat.router, tags=["chat"])
 app.include_router(config.router, tags=["config"])
@@ -146,6 +146,7 @@ app.include_router(health.router)
 app.include_router(system.router)
 app.include_router(docs.router)
 app.include_router(energy.router)
+app.include_router(analytics.router)
 
 log.info("All routers registered")
 
