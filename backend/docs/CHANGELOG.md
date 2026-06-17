@@ -1,4 +1,42 @@
 # Changelog
+[3.2.0] - 2026-06-17
+### Added
+- **Модуль analytics** — полноценный движок аналитики SCADA-системы
+- **Collectors**: сбор исторических данных (hourly/daily/raw) с адаптивным downsampling
+- **Analyzers**: тренды (линейная регрессия), корреляции (Pearson), ранжирование проблем
+- **LLM layer**: YandexGPT инсайты + детерминированный fallback
+- **Endpoint GET /analytics/report** с параметрами period/params/aggregation
+- **Визуализация аналитики** (Chart.js + svelte-chartjs):
+- **Интерактивные графики** с 4 линиями (данные, тренд, MA-7, прогноз)
+- **Фиксированные пределы оси Y** по физическим границам параметров
+- **Zoom/pan** через chartjs-plugin-zoom (колёсико мыши, drag, pinch)
+- **Экспорт графиков** в PNG через chart.toBase64Image()
+- **Кнопки управления**: Zoom In/Out/Reset/Download
+
+UI аналитики:
+- **AnalyticsPanel** виджет с 4 вкладками (Тренды, Проблемы, Рекомендации, Прогноз)
+- **Периоды прогноза**: 7/30/90/365 дней
+- **Раскрывающиеся карточки проблем** (компоненты impact, нормы параметра)
+- **Раскрывающиеся карточки рекомендаций** (детали расчёта)
+- **Русификация** всех текстов (severity, effort, reason)
+
+Интеграция с чатом:
+- **Ключевые слова**: "аналитик", "тренд", "прогноз", "рекомендац", "корреляц"
+- **Команда "покажи аналитику"** в правой инфопанели
+- **Автооткрытие AnalyticsPanel** через visual.widgets
+
+### Fixed
+- **state_snapshot_uncloneable warning** — убраны callbacks из Chart.js options
+- **Математика тренда** — правильная формула на основе дней (не количества точек)
+- **Корректное масштабирование оси Y** через suggestedMin/suggestedMax
+- **Цветовые конфликты — MA-7** теперь нейтральный серый (#9ca3af)
+
+### Technical
+
+- **Установлены**: chart.js, svelte-chartjs, chartjs-plugin-zoom
+- **Backend возвращает raw_data** для графиков (до 500 точек с downsampling)
+- **Frontend: ChartJS.getChart(canvas)** для доступа к Chart instance
+- **Модуль analytics** добавлен в /system/info capabilities
 
 ## [3.1.0] - 2026-06-09
 

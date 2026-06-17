@@ -12,6 +12,33 @@
 | energy_heat | Учёт потребления тепла | calculate_heat_cost, get_heat_consumption | — |
 | hello | Базовые ответы | — | — |
 | logs | Анализ системных логов | analyze_logs | — |
+| analytics | Тренд-анализ, прогнозы, корреляции | (через /chat) | analytics_panel
+
+## Модуль analytics
+**Назначение:** Полноценный движок аналитики SCADA-системы с трендами, прогнозами и визуализацией.
+
+### Архитектура
+
+```
+modules/analytics/
+├── __init__.py              # Регистрация модуля
+├── collectors/
+│   └── history.py           # Сбор данных из TimescaleDB
+├── analyzers/
+│   ├── trends.py            # Линейная регрессия, R², slope
+│   ├── correlations.py      # Pearson + временной лаг
+│   └── aggregators.py       # Ранжирование проблем
+├── llm/
+│   └── analyzer.py          # YandexGPT + deterministic fallback
+└── norms.py                 # Нормативные диапазоны
+```
+
+**Ключевые метрики**
+- Тренды: slope_per_day, r_squared, direction (rising/falling/stable)
+- Аномалии: Z-score > 3σ от среднего
+- Корреляции: Pearson (r ∈ [-1, 1]) с временным лагом ±24 часа
+- Impact Score: deviation + trend + anomalies + outliers
+- Прогнозы: экстраполяция тренда на 7/30/90/365 дней
 
 ## Модуль health
 

@@ -1,4 +1,12 @@
-<script lang="ts">
+from pathlib import Path
+
+print('=== fix_chart_instance_onmount.py ===')
+print()
+
+PROJECT_ROOT = Path('.')
+chart_path = PROJECT_ROOT / 'frontend/src/components/analytics/TrendChart.svelte'
+
+chart_content = '''<script lang="ts">
   import { onMount } from 'svelte'
   import { Line } from 'svelte-chartjs'
   import {
@@ -38,9 +46,34 @@
 
   let { data = [], label = '', unit = '', color = '#2563eb', trend, yRange }: Props = $props()
 
-  // Уникальный ID для контейнера графика
-  const chartId = `chart-${Math.random().toString(36).slice(2, 9)}`
+  // Ссылка на компонент Line (svelte-chartjs)
+  let chartComponent: any = null
   let chartInstance: ChartJS | null = null
+
+  // Получаем Chart instance после монтирования
+  onMount(() => {
+    // Даем время компоненту полностью отрендериться
+    setTimeout(() => {
+      console.log('onMount: chartComponent =', chartComponent)
+      console.log('onMount: chartComponent keys =', chartComponent ? Object.keys(chartComponent) : 'null')
+      
+      if (chartComponent) {
+        // svelte-chartjs может иметь chart как свойство или через getChart()
+        if (chartComponent.chart) {
+          chartInstance = chartComponent.chart
+          console.log('✓ Chart instance obtained via .chart:', chartInstance)
+        } else if (typeof chartComponent.getChart === 'function') {
+          chartInstance = chartComponent.getChart()
+          console.log('✓ Chart instance obtained via .getChart():', chartInstance)
+        } else {
+          console.warn('✗ chartComponent does not have .chart or .getChart()')
+          console.log('  chartComponent structure:', JSON.stringify(chartComponent, null, 2).substring(0, 500))
+        }
+      } else {
+        console.warn('✗ chartComponent is null after onMount')
+      }
+    }, 100)
+  })
 
   function clip(value: number): number {
     if (!yRange) return value
@@ -213,33 +246,8 @@
     }
   }
 
-  // Получаем Chart instance через Chart.getChart(canvas)
-  onMount(() => {
-    setTimeout(() => {
-      const container = document.getElementById(chartId)
-      if (!container) {
-        console.warn('Chart container not found:', chartId)
-        return
-      }
-      
-      const canvas = container.querySelector('canvas')
-      if (!canvas) {
-        console.warn('Canvas not found in container:', chartId)
-        return
-      }
-
-      // Chart.js хранит instance в глобальном реестре
-      chartInstance = ChartJS.getChart(canvas) || null
-      
-      if (chartInstance) {
-        console.log('✓ Chart instance obtained via Chart.getChart(canvas)')
-      } else {
-        console.warn('✗ Chart.getChart(canvas) returned null')
-      }
-    }, 150)
-  })
-
   function zoomIn() {
+    console.log('zoomIn called, chartInstance:', chartInstance)
     if (chartInstance) {
       chartInstance.zoom(1.2)
     } else {
@@ -248,6 +256,7 @@
   }
 
   function zoomOut() {
+    console.log('zoomOut called, chartInstance:', chartInstance)
     if (chartInstance) {
       chartInstance.zoom(0.8)
     } else {
@@ -256,6 +265,7 @@
   }
 
   function resetZoom() {
+    console.log('resetZoom called, chartInstance:', chartInstance)
     if (chartInstance) {
       chartInstance.resetZoom()
     } else {
@@ -264,6 +274,7 @@
   }
 
   function downloadPNG() {
+    console.log('downloadPNG called, chartInstance:', chartInstance)
     if (!chartInstance) {
       console.warn('Chart instance not available')
       return
@@ -324,9 +335,9 @@
     </div>
   </div>
 
-  <div id={chartId} class="h-[200px]">
+  <div class="h-[200px]">
     {#if data.length > 0}
-      <Line data={chartData} options={chartOptions} />
+      <Line bind:this={chartComponent} data={chartData} options={chartOptions} />
     {:else}
       <div class="flex items-center justify-center h-full text-sm text-neutral-400">
         Нет данных для графика
@@ -338,3 +349,38 @@
     Колёсико мыши — масштаб · Перетаскивание — прокрутка
   </div>
 </div>
+'''
+
+chart_path.write_text(chart_content, encoding='utf-8', newline='\n')
+print('✓ TrendChart.svelte: исправлено получение Chart instance')
+print()
+print('=' * 60)
+print('ЧТО ИСПРАВЛЕНО:')
+print('=' * 60)
+print()
+print('1. Замена $effect на onMount:')
+print('   • $effect не срабатывает правильно в Svelte 5 runes mode')
+print('   • onMount гарантированно выполняется после монтирования')
+print()
+print('2. Расширенное логирование:')
+print('   • Показывает структуру chartComponent')
+print('   • Проверяет .chart и .getChart()')
+print('   • Выводит keys объекта для дебага')
+print()
+print('3. setTimeout 100ms:')
+print('   • Дает время svelte-chartjs полностью отрендериться')
+print('   • Chart instance может быть недоступен сразу')
+print()
+print('Frontend перезагрузится автоматически (Vite HMR).')
+print()
+print('Проверка:')
+print('  1. В чате: "покажи аналитику"')
+print('  2. Открой DevTools → Console')
+print('  3. Должно появиться:')
+print('     "onMount: chartComponent = {...}"')
+print('     "onMount: chartComponent keys = [...]"')
+print('     "✓ Chart instance obtained via .chart: Chart {...}"')
+print('  4. Если chartInstance получен — кнопки заработают')
+print()
+print('Скинь вывод из DevTools Console после загрузки графика —')
+print('я увижу структуру chartComponent и дам финальный фикс если нужно.')

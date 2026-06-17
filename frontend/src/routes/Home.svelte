@@ -137,6 +137,9 @@
       caps.push({ text: 'проанализируй системный лог', category: 'Анализ' })
       caps.push({ text: 'покажи логи', category: 'Система', action: 'logs' })
     }
+    if (systemInfo?.modules?.includes('analytics')) {
+      caps.push({ text: 'покажи аналитику', category: 'Анализ', action: 'analytics_panel' })
+    }
     if (systemInfo?.modules?.includes('schedules')) {
       caps.push({ text: 'расписания', category: 'Планирование' })
     }

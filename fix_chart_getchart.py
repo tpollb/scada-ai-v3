@@ -1,4 +1,12 @@
-<script lang="ts">
+from pathlib import Path
+
+print('=== fix_chart_getchart.py ===')
+print()
+
+PROJECT_ROOT = Path('.')
+chart_path = PROJECT_ROOT / 'frontend/src/components/analytics/TrendChart.svelte'
+
+chart_content = '''<script lang="ts">
   import { onMount } from 'svelte'
   import { Line } from 'svelte-chartjs'
   import {
@@ -338,3 +346,36 @@
     Колёсико мыши — масштаб · Перетаскивание — прокрутка
   </div>
 </div>
+'''
+
+chart_path.write_text(chart_content, encoding='utf-8', newline='\n')
+print('✓ TrendChart.svelte: исправлено получение Chart instance')
+print()
+print('=' * 60)
+print('ЧТО ИСПРАВЛЕНО:')
+print('=' * 60)
+print()
+print('Корень проблемы:')
+print('  • svelte-chartjs возвращает объект компонента {$destroy, $on, $set}')
+print('  • Chart.js instance НЕ экспортируется из svelte-chartjs')
+print('  • bind:this не даёт доступа к chart')
+print()
+print('Решение: Chart.getChart(canvas)')
+print('  1. Обернули <Line> в <div id={chartId}>')
+print('  2. В onMount находим canvas внутри контейнера')
+print('  3. Используем ChartJS.getChart(canvas) — глобальный метод Chart.js')
+print('  4. Получаем реальный Chart instance')
+print()
+print('Почему это работает:')
+print('  • Chart.js регистрирует каждый instance в глобальном реестре')
+print('  • Chart.getChart(canvas) возвращает instance по canvas элементу')
+print('  • Не зависит от внутренней реализации svelte-chartjs')
+print()
+print('Frontend перезагрузится автоматически (Vite HMR).')
+print()
+print('Проверка:')
+print('  1. В чате: "покажи аналитику"')
+print('  2. Открой DevTools → Console')
+print('  3. Должно появиться: "✓ Chart instance obtained via Chart.getChart(canvas)"')
+print('  4. Нажми Zoom In — график масштабируется')
+print('  5. Нажми Download — скачивается PNG')

@@ -1,5 +1,12 @@
-<script lang="ts">
-  import { onMount } from 'svelte'
+from pathlib import Path
+
+print('=== fix_chart_buttons.py ===')
+print()
+
+PROJECT_ROOT = Path('.')
+chart_path = PROJECT_ROOT / 'frontend/src/components/analytics/TrendChart.svelte'
+
+chart_content = '''<script lang="ts">
   import { Line } from 'svelte-chartjs'
   import {
     Chart as ChartJS,
@@ -38,9 +45,13 @@
 
   let { data = [], label = '', unit = '', color = '#2563eb', trend, yRange }: Props = $props()
 
-  // Уникальный ID для контейнера графика
-  const chartId = `chart-${Math.random().toString(36).slice(2, 9)}`
+  // Chart instance — сохраняем через callback ref
   let chartInstance: ChartJS | null = null
+
+  function setChartRef(node: any) {
+    // svelte-chartjs возвращает { chart: ChartJS }
+    chartInstance = node?.chart || node || null
+  }
 
   function clip(value: number): number {
     if (!yRange) return value
@@ -213,33 +224,9 @@
     }
   }
 
-  // Получаем Chart instance через Chart.getChart(canvas)
-  onMount(() => {
-    setTimeout(() => {
-      const container = document.getElementById(chartId)
-      if (!container) {
-        console.warn('Chart container not found:', chartId)
-        return
-      }
-      
-      const canvas = container.querySelector('canvas')
-      if (!canvas) {
-        console.warn('Canvas not found in container:', chartId)
-        return
-      }
-
-      // Chart.js хранит instance в глобальном реестре
-      chartInstance = ChartJS.getChart(canvas) || null
-      
-      if (chartInstance) {
-        console.log('✓ Chart instance obtained via Chart.getChart(canvas)')
-      } else {
-        console.warn('✗ Chart.getChart(canvas) returned null')
-      }
-    }, 150)
-  })
-
+  // Функции управления графиком
   function zoomIn() {
+    console.log('zoomIn called, chartInstance:', chartInstance)
     if (chartInstance) {
       chartInstance.zoom(1.2)
     } else {
@@ -248,6 +235,7 @@
   }
 
   function zoomOut() {
+    console.log('zoomOut called, chartInstance:', chartInstance)
     if (chartInstance) {
       chartInstance.zoom(0.8)
     } else {
@@ -256,6 +244,7 @@
   }
 
   function resetZoom() {
+    console.log('resetZoom called, chartInstance:', chartInstance)
     if (chartInstance) {
       chartInstance.resetZoom()
     } else {
@@ -264,6 +253,7 @@
   }
 
   function downloadPNG() {
+    console.log('downloadPNG called, chartInstance:', chartInstance)
     if (!chartInstance) {
       console.warn('Chart instance not available')
       return
@@ -287,6 +277,7 @@
       <div></div>
     {/if}
     
+    <!-- Кнопки управления графиком -->
     <div class="flex items-center gap-1">
       <button
         type="button"
@@ -324,9 +315,9 @@
     </div>
   </div>
 
-  <div id={chartId} class="h-[200px]">
+  <div class="h-[200px]">
     {#if data.length > 0}
-      <Line data={chartData} options={chartOptions} />
+      <Line use:ref={setChartRef} data={chartData} options={chartOptions} />
     {:else}
       <div class="flex items-center justify-center h-full text-sm text-neutral-400">
         Нет данных для графика
@@ -338,3 +329,41 @@
     Колёсико мыши — масштаб · Перетаскивание — прокрутка
   </div>
 </div>
+'''
+
+chart_path.write_text(chart_content, encoding='utf-8', newline='\n')
+print('✓ TrendChart.svelte: исправлены кнопки управления')
+print()
+print('=' * 60)
+print('ЧТО ИСПРАВЛЕНО:')
+print('=' * 60)
+print()
+print('1. Доступ к Chart instance:')
+print('   • БЫЛО: bind:this={chartRef} — не работает с svelte-chartjs')
+print('   • СТАЛО: use:ref={setChartRef} — callback получает node.chart')
+print('   • chartInstance сохраняется в переменной')
+print()
+print('2. Функции управления:')
+print('   • Добавлены console.log для дебага')
+print('   • Проверяется наличие chartInstance перед вызовом методов')
+print('   • Если chartInstance = null — выводится warning в консоль')
+print()
+print('3. Методы Chart.js:')
+print('   • zoom(1.2) — увеличивает масштаб на 20%')
+print('   • zoom(0.8) — уменьшает масштаб на 20%')
+print('   • resetZoom() — сбрасывает масштаб')
+print('   • toBase64Image() — экспортирует PNG')
+print()
+print('Frontend перезагрузится автоматически (Vite HMR).')
+print()
+print('Проверка:')
+print('  1. В чате: "покажи аналитику"')
+print('  2. Открой DevTools → Console')
+print('  3. Нажми кнопку Zoom In — должно появиться:')
+print('     "zoomIn called, chartInstance: Chart {...}"')
+print('  4. Если chartInstance = null — будет warning:')
+print('     "Chart instance not available"')
+print('  5. Если всё ок — график масштабируется/скачивается')
+print()
+print('Скинь вывод из DevTools Console после нажатия кнопок —')
+print('я увижу что именно не работает.')

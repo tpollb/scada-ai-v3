@@ -1,6 +1,37 @@
-<script lang="ts">
-  import { onMount } from 'svelte'
-  import { Line } from 'svelte-chartjs'
+from pathlib import Path
+import subprocess
+
+print('=== add_zoom_download.py ===')
+print()
+
+PROJECT_ROOT = Path('.')
+
+# ============================================================================
+# 1. Устанавливаем chartjs-plugin-zoom
+# ============================================================================
+print('Устанавливаем chartjs-plugin-zoom...')
+frontend_dir = PROJECT_ROOT / 'frontend'
+result = subprocess.run(
+    'npm install chartjs-plugin-zoom',
+    cwd=frontend_dir,
+    shell=True,
+    capture_output=True,
+    text=True
+)
+
+if result.returncode == 0:
+    print('✓ Установлен chartjs-plugin-zoom')
+else:
+    print(f'⚠ Ошибка установки: {result.stderr[:200]}')
+    print('Запусти вручную: cd frontend && npm install chartjs-plugin-zoom')
+
+# ============================================================================
+# 2. TrendChart.svelte — добавляем zoom/pan и download
+# ============================================================================
+chart_path = PROJECT_ROOT / 'frontend/src/components/analytics/TrendChart.svelte'
+
+chart_content = '''<script lang="ts">
+  import { Line, getDatasetAtEvent } from 'svelte-chartjs'
   import {
     Chart as ChartJS,
     CategoryScale,
@@ -38,9 +69,8 @@
 
   let { data = [], label = '', unit = '', color = '#2563eb', trend, yRange }: Props = $props()
 
-  // Уникальный ID для контейнера графика
-  const chartId = `chart-${Math.random().toString(36).slice(2, 9)}`
-  let chartInstance: ChartJS | null = null
+  // Ссылка на компонент Line для доступа к Chart instance
+  let chartRef: any = null
 
   function clip(value: number): number {
     if (!yRange) return value
@@ -113,7 +143,7 @@
         datasets.push({
           label: 'MA-7 (скользящая средняя)',
           data: maValues,
-          borderColor: '#9ca3af',
+          borderColor: '#8b5cf6',
           borderWidth: 2,
           pointRadius: 0,
           fill: false,
@@ -213,63 +243,33 @@
     }
   }
 
-  // Получаем Chart instance через Chart.getChart(canvas)
-  onMount(() => {
-    setTimeout(() => {
-      const container = document.getElementById(chartId)
-      if (!container) {
-        console.warn('Chart container not found:', chartId)
-        return
-      }
-      
-      const canvas = container.querySelector('canvas')
-      if (!canvas) {
-        console.warn('Canvas not found in container:', chartId)
-        return
-      }
-
-      // Chart.js хранит instance в глобальном реестре
-      chartInstance = ChartJS.getChart(canvas) || null
-      
-      if (chartInstance) {
-        console.log('✓ Chart instance obtained via Chart.getChart(canvas)')
-      } else {
-        console.warn('✗ Chart.getChart(canvas) returned null')
-      }
-    }, 150)
-  })
+  // Получаем Chart instance из ref
+  function getChartInstance(): ChartJS | null {
+    if (!chartRef) return null
+    // svelte-chartjs возвращает компонент, внутри chart: chartRef.chart
+    return (chartRef as any).chart || null
+  }
 
   function zoomIn() {
-    if (chartInstance) {
-      chartInstance.zoom(1.2)
-    } else {
-      console.warn('Chart instance not available')
-    }
+    const chart = getChartInstance()
+    if (chart) chart.zoom(1.2)
   }
 
   function zoomOut() {
-    if (chartInstance) {
-      chartInstance.zoom(0.8)
-    } else {
-      console.warn('Chart instance not available')
-    }
+    const chart = getChartInstance()
+    if (chart) chart.zoom(0.8)
   }
 
   function resetZoom() {
-    if (chartInstance) {
-      chartInstance.resetZoom()
-    } else {
-      console.warn('Chart instance not available')
-    }
+    const chart = getChartInstance()
+    if (chart) chart.resetZoom()
   }
 
   function downloadPNG() {
-    if (!chartInstance) {
-      console.warn('Chart instance not available')
-      return
-    }
+    const chart = getChartInstance()
+    if (!chart) return
     
-    const base64 = chartInstance.toBase64Image('image/png', 1.0)
+    const base64 = chart.toBase64Image('image/png', 1.0)
     const link = document.createElement('a')
     const param = label || 'chart'
     const date = new Date().toISOString().slice(0, 10)
@@ -287,6 +287,7 @@
       <div></div>
     {/if}
     
+    <!-- Кнопки управления графиком -->
     <div class="flex items-center gap-1">
       <button
         type="button"
@@ -324,9 +325,9 @@
     </div>
   </div>
 
-  <div id={chartId} class="h-[200px]">
+  <div class="h-[200px]">
     {#if data.length > 0}
-      <Line data={chartData} options={chartOptions} />
+      <Line bind:this={chartRef} data={chartData} options={chartOptions} />
     {:else}
       <div class="flex items-center justify-center h-full text-sm text-neutral-400">
         Нет данных для графика
@@ -338,3 +339,36 @@
     Колёсико мыши — масштаб · Перетаскивание — прокрутка
   </div>
 </div>
+'''
+
+chart_path.write_text(chart_content, encoding='utf-8', newline='\n')
+print('✓ TrendChart.svelte: добавлены zoom/pan и download')
+
+print()
+print('=' * 60)
+print('ЧТО ДОБАВЛЕНО:')
+print('=' * 60)
+print()
+print('1. Zoom/pan (chartjs-plugin-zoom):')
+print('   • Колёсико мыши — масштабирование по оси X')
+print('   • Перетаскивание (drag) — прокрутка по оси X')
+print('   • Pinch на тач-устройствах')
+print('   • Кнопки: Zoom In (+20%), Zoom Out (-20%), Reset')
+print()
+print('2. Download PNG:')
+print('   • Кнопка "Скачать" с иконкой Download')
+print('   • Сохраняет текущий вид графика (с zoom) в PNG')
+print('   • Имя файла: scada_{param}_{date}.png')
+print()
+print('3. Подсказка под графиком:')
+print('   • "Колёсико мыши — масштаб · Перетаскивание — прокрутка"')
+print()
+print('Frontend перезагрузится автоматически (Vite HMR).')
+print()
+print('Проверка:')
+print('  1. В чате: "покажи аналитику"')
+print('  2. Наведи на график — появятся кнопки управления')
+print('  3. Покрути колёсико — график масштабируется')
+print('  4. Потяни мышью — график прокручивается')
+print('  5. Нажми Download — скачается PNG')
+print('  6. Нажми Reset — масштаб вернётся')
