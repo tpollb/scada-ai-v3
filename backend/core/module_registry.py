@@ -26,12 +26,12 @@ class Module:
             with open(config_path, "r", encoding="utf-8") as f:
                 self.config = yaml.safe_load(f) or {}
 
-        # Load prompts
+        # Load prompts (только строки, функции игнорируем)
         prompts_module = importlib.import_module(f"modules.{self.name}.prompts")
         self.prompts = {
             name: getattr(prompts_module, name)
             for name in dir(prompts_module)
-            if not name.startswith("_")
+            if not name.startswith("_") and isinstance(getattr(prompts_module, name), str)
         }
 
         # Load tools

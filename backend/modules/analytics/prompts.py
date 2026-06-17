@@ -26,7 +26,7 @@ ANALYTICS_SYSTEM_PROMPT = """Ты — старший инженер-аналит
   ],
   "recommendations": [
     {
-      "action": "Конкретное действие (например: проверьте вентиляцию в Зоне 2)",
+      "action": "Конкретное действие",
       "impact": "+N баллов здоровья или экономия N кВт·ч",
       "effort": "low|medium|high",
       "priority": "low|medium|high|critical"
@@ -45,55 +45,3 @@ ANALYTICS_SYSTEM_PROMPT = """Ты — старший инженер-аналит
 - НЕ используй markdown в ответе (только чистый JSON)
 - Отвечай на русском языке
 """
-
-
-def build_analytics_prompt(
-    trends: dict,
-    correlations: list,
-    top_issues: list,
-    period_days: int,
-) -> str:
-    """
-    Строит user prompt с данными аналитики.
-    """
-    import json
-    
-    lines = [
-        f"Анализирую данные за последние {period_days} дней. Дай аналитический отчёт.",
-        "",
-        "=== ТРЕНДЫ ПАРАМЕТРОВ ===",
-    ]
-    
-    for param, trend in trends.items():
-        lines.append(f"• {param}:")
-        lines.append(f"    Среднее: {trend.get('avg', 'N/A')}")
-        lines.append(f"    Диапазон: {trend.get('min', 'N/A')} - {trend.get('max', 'N/A')}")
-        lines.append(f"    Тренд: {trend.get('direction', 'N/A')} ({trend.get('slope_per_day', 0):+.3f}/день, R²={trend.get('r_squared', 0):.3f})")
-        lines.append(f"    Аномалий: {trend.get('anomalies', 0)} ({trend.get('anomaly_rate', 0):.1%})")
-        lines.append(f"    Битых датчиков: {trend.get('outliers_count', 0)}")
-        lines.append("")
-    
-    lines.append("=== КОРРЕЛЯЦИИ ===")
-    if correlations:
-        for corr in correlations[:5]:
-            lines.append(f"• {corr['params'][0]} ↔ {corr['params'][1]}: r={corr['coefficient']:+.3f} ({corr['interpretation']}, {corr['strength']})")
-    else:
-        lines.append("• Сильных корреляций не обнаружено")
-    lines.append("")
-    
-    lines.append("=== ТОП ПРОБЛЕМ (по влиянию на health score) ===")
-    if top_issues:
-        for i, issue in enumerate(top_issues[:5], 1):
-            lines.append(f"{i}. {issue['param']}: impact={issue['impact']:+.1f} баллов, severity={issue['severity']}")
-            lines.append(f"   Причина: {issue['reason']}")
-            if issue.get('days_to_critical'):
-                lines.append(f"   Дней до критического уровня: {issue['days_to_critical']}")
-    else:
-        lines.append("• Серьёзных проблем не обнаружено")
-    lines.append("")
-    
-    lines.append("=== ТВОЯ ЗАДАЧА ===")
-    lines.append("Сгенерируй отчёт в СТРОГОМ JSON-формате согласно системному промпту.")
-    lines.append("Используй реальные цифры из данных выше. Не выдумывай.")
-    
-    return "\n".join(lines)

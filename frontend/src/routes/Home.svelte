@@ -74,8 +74,19 @@
       const resp: any = await api.post('chat', { json: { message } }).json()
       addMessage('assistant', resp.response)
 
+      // DEBUG: логируем что пришло с backend
+      console.log('Chat response:', {
+        status: resp.status,
+        has_visual: !!resp.visual,
+        visual_widgets: resp.visual?.widgets,
+        widgets_count: resp.visual?.widgets?.length || 0
+      })
+      
       if (resp.visual?.widgets && resp.visual.widgets.length > 0) {
+        console.log('Setting widgets:', resp.visual.widgets)
         currentWidgets = resp.visual.widgets
+      } else {
+        console.log('No widgets to render')
       }
 
       if (resp.voice?.text) {

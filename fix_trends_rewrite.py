@@ -1,4 +1,15 @@
-"""Анализ трендов — работает с агрегированными данными (hourly/daily)"""
+from pathlib import Path
+
+print('=== fix_trends_rewrite.py ===')
+print()
+
+PROJECT_ROOT = Path('.')
+trends_path = PROJECT_ROOT / 'backend/modules/analytics/analyzers/trends.py'
+
+# ============================================================================
+# Полностью переписываем файл с правильным raw_data
+# ============================================================================
+file_content = '''"""Анализ трендов — работает с агрегированными данными (hourly/daily)"""
 from typing import Any
 from datetime import datetime
 import statistics
@@ -139,28 +150,13 @@ def analyze_param_trend(param_data: dict) -> dict:
 
     anomaly_rate = anomalies / len(valid_values) if valid_values else 0
 
-    # Добавляем raw_data для графиков (адаптивно: все точки если <500, иначе downsampling)
-    raw_data_all = []
-    for p in data_points:
+    # Добавляем raw_data для графиков (первые 200 точек)
+    raw_data = []
+    for p in data_points[:200]:
         ts = p.get("bucket_start") or p.get("timestamp")
         val = p.get("avg") if "avg" in p else p.get("value")
         if ts is not None and val is not None:
-            raw_data_all.append({"timestamp": ts, "value": val})
-
-    # Downsampling если точек слишком много (лимит 500 для производительности)
-    MAX_POINTS = 500
-    if len(raw_data_all) <= MAX_POINTS:
-        raw_data = raw_data_all
-    else:
-        # Берём каждую N-ю точку, но ВСЕГДА включаем последнюю
-        step = len(raw_data_all) / MAX_POINTS
-        raw_data = []
-        i = 0.0
-        while int(i) < len(raw_data_all) - 1:
-            raw_data.append(raw_data_all[int(i)])
-            i += step
-        # Гарантированно добавляем последнюю точку
-        raw_data.append(raw_data_all[-1])
+            raw_data.append({"timestamp": ts, "value": val})
 
     return {
         "param": param_key,
@@ -195,3 +191,52 @@ def analyze_trends(history_data: dict) -> dict:
         "aggregation": history_data.get("aggregation", "auto"),
         "trends": trends,
     }
+'''
+
+# Проверяем синтаксис ПЕРЕД записью
+try:
+    compile(file_content, 'trends.py', 'exec')
+    print('✓ Python syntax check passed')
+except SyntaxError as e:
+    print(f'⚠ Syntax error в самом скрипте: {e}')
+    exit(1)
+
+# Записываем файл
+trends_path.write_text(file_content, encoding='utf-8', newline='\n')
+print(f'✓ Файл перезаписан: {trends_path}')
+print(f'  Размер: {len(file_content)} байт')
+
+print()
+print('=' * 60)
+print('ЧТО ИСПРАВЛЕНО:')
+print('=' * 60)
+print()
+print('Файл переписан полностью с правильной структурой:')
+print()
+print('  def analyze_param_trend(...):')
+print('      ... вычисления ...')
+print('      ')
+print('      # Добавляем raw_data для графиков (первые 200 точек)')
+print('      raw_data = []')
+print('      for p in data_points[:200]:')
+print('          ts = p.get("bucket_start") or p.get("timestamp")')
+print('          val = p.get("avg") if "avg" in p else p.get("value")')
+print('          if ts is not None and val is not None:')
+print('              raw_data.append({"timestamp": ts, "value": val})')
+print('      ')
+print('      return {')
+print('          "param": param_key,')
+print('          ...')
+print('          "anomaly_rate": round(anomaly_rate, 4),')
+print('          "raw_data": raw_data,')
+print('      }')
+print()
+print('Ключевое отличие от предыдущих версий:')
+print('  • raw_data = [] ПЕРЕД return (не внутри dict)')
+print('  • "raw_data": raw_data ВНУТРИ return dict')
+print()
+print('Backend перезагрузится автоматически (hot-reload).')
+print()
+print('Проверка:')
+print('  curl "http://localhost:8081/analytics/report?period=7&params=temperature"')
+print('  → Должен вернуть JSON с полем "raw_data" в trends.temperature')

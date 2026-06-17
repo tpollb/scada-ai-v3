@@ -63,7 +63,13 @@ async def system_info():
         "llm_status": llm_status,
         "scada_url": settings.scada_base_url,
         "last_health_check": _last_health_check,
-        "server_time": datetime.now().isoformat()
+        "server_time": datetime.now().isoformat(),
+        "capabilities": [
+            {"text": "покажи аналитику", "category": "analytics", "action": "analytics_panel"},
+            {"text": "как здоровье здания", "category": "health", "action": "health_score"},
+            {"text": "покажи логи", "category": "logs", "action": "system_logs"},
+            {"text": "расчёт электричества", "category": "energy", "action": "electricity_cost"}
+        ]
     }
 
 

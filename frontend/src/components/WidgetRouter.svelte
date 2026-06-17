@@ -4,6 +4,7 @@
   import IssuesList from './health/IssuesList.svelte'
   import EnvironmentalPanel from './health/EnvironmentalPanel.svelte'
   import AlarmsPanel from './health/AlarmsPanel.svelte'
+  import AnalyticsPanel from './analytics/AnalyticsPanel.svelte'
   import LifeSupportCard from './health/LifeSupportCard.svelte'
   import { ChevronDown, ChevronUp, X } from 'lucide-svelte'
 
@@ -22,6 +23,7 @@
     'issues_list': IssuesList,
     'environmental_panel': EnvironmentalPanel,
     'alarms_panel': AlarmsPanel,
+    'analytics_panel': AnalyticsPanel,
   }
 
   function handleClose() {

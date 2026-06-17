@@ -23,7 +23,79 @@ class ChatResponse(BaseModel):
     tool_calls: list[str] = []
 
 
-HEALTH_KEYWORDS = ["здоров", "состояни", "аналитик", "проблем", "авари", "диагност", "отчёт", "что с", "как дела"]
+HEALTH_KEYWORDS = ["здоров", "состояни", "проблем", "авари", "диагност", "отчёт", "что с", "как дела"]
+ANALYTICS_KEYWORDS = ["аналитик", "тренд", "прогноз", "рекомендац", "корреляц", "analytics"]
+
+
+def is_analytics_query(text: str) -> bool:
+    """Проверяет запрос на аналитику"""
+    lower = text.lower()
+    return any(kw in lower for kw in ANALYTICS_KEYWORDS)
+
+
+async def handle_analytics_query(message: str, provider) -> ChatResponse:
+    """Обрабатывает запрос на аналитику — возвращает виджет analytics_panel"""
+    try:
+        from modules.analytics.collectors.history import collect_history
+        from modules.analytics.analyzers.trends import analyze_trends
+        from modules.analytics.analyzers.correlations import find_correlations
+        from modules.analytics.analyzers.aggregators import rank_issues
+        from modules.analytics.llm.analyzer import get_analytics_llm
+
+        # Собираем данные за 30 дней
+        history = await collect_history(days=30, params=None, aggregation="auto")
+        trends = analyze_trends(history)
+        correlations = find_correlations(history, min_correlation=0.5)
+        top_issues = rank_issues(history_data=history, trends_data=trends, top_n=5)
+
+        # LLM insights
+        llm = get_analytics_llm()
+        llm_result = await llm.analyze(
+            trends=trends["trends"],
+            correlations=correlations,
+            top_issues=top_issues,
+            period_days=30,
+        )
+
+        summary = llm_result.get("summary", "Аналитический отчёт готов")
+
+        log.info("handle_analytics_query returning",
+                 summary_len=len(summary),
+                 has_trends="trends" in trends,
+                 trends_count=len(trends.get("trends", {})),
+                 correlations_count=len(correlations),
+                 top_issues_count=len(top_issues),
+                 has_llm="summary" in llm_result)
+        
+        return ChatResponse(
+            response=summary,
+            status="success",
+            visual={
+                "widgets": [
+                    {
+                        "type": "analytics_panel",
+                        "data": {
+                            "period_days": 30,
+                            "trends": trends["trends"],
+                            "correlations": correlations,
+                            "top_issues": top_issues,
+                            "summary": llm_result.get("summary", ""),
+                            "insights": llm_result.get("insights", []),
+                            "recommendations": llm_result.get("recommendations", []),
+                            "forecast": llm_result.get("forecast", {})
+                        },
+                        "size": "wide"
+                    }
+                ]
+            }
+        )
+    except Exception as e:
+        log.error("Analytics query failed", error=str(e))
+        return ChatResponse(
+            response=f"Не удалось загрузить аналитику: {e}",
+            status="error"
+        )
+
 
 
 def is_health_query(text: str) -> bool:
@@ -75,6 +147,9 @@ async def chat(req: ChatRequest):
             response=f"⚠️ LLM не настроен: {e}",
             status="error",
         )
+
+    if is_analytics_query(req.message):
+        return await handle_analytics_query(req.message, provider)
 
     if is_health_query(req.message):
         return await handle_health_query(req.message, provider)
