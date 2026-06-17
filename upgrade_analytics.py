@@ -1,4 +1,206 @@
-<script lang="ts">
+from pathlib import Path
+
+print('=== upgrade_analytics.py ===')
+print()
+print('Добавляем:')
+print('  1. Линия тренда + экстраполяция на графиках')
+print('  2. Прогнозы на 7/30/90/365 дней')
+print('  3. Раскрывающиеся карточки рекомендаций')
+print('  4. Раскрывающиеся карточки проблем')
+print()
+
+PROJECT_ROOT = Path('.')
+
+# ============================================================================
+# 1. TrendChart.svelte — добавляем линию тренда и экстраполяцию
+# ============================================================================
+chart_path = PROJECT_ROOT / 'frontend/src/components/analytics/TrendChart.svelte'
+chart_content = '''<script lang="ts">
+  import { Line } from 'svelte-chartjs'
+  import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+  } from 'chart.js'
+
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+  )
+
+  interface Props {
+    data: Array<{ timestamp: string; value: number }>
+    label?: string
+    unit?: string
+    color?: string
+    trend?: { slope_per_day: number; r_squared: number; direction: string }
+  }
+
+  let { data = [], label = '', unit = '', color = '#2563eb', trend }: Props = $props()
+
+  // Конвертируем данные в формат Chart.js
+  let chartData = $derived(() => {
+    const labels = data.map(d => {
+      const date = new Date(d.timestamp)
+      return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    })
+
+    const datasets: any[] = [
+      {
+        label: 'Данные',
+        data: data.map(d => d.value),
+        borderColor: color,
+        backgroundColor: color + '20',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        order: 2,
+      }
+    ]
+
+    // Добавляем линию тренда если есть данные и тренд
+    if (data.length >= 2 && trend && trend.r_squared > 0.1) {
+      // Вычисляем точки тренда (линейная регрессия)
+      const values = data.map(d => d.value)
+      const n = values.length
+      const x_mean = (n - 1) / 2
+      const y_mean = values.reduce((a, b) => a + b, 0) / n
+
+      const slope = trend.slope_per_day * (n / 30) // нормализуем к количеству точек
+      const intercept = y_mean - slope * x_mean
+
+      const trendValues = values.map((_, i) => slope * i + intercept)
+
+      datasets.push({
+        label: 'Тренд',
+        data: trendValues,
+        borderColor: '#64748b',
+        borderDash: [5, 5],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        order: 1,
+      })
+
+      // Добавляем экстраполяцию (прогноз) на 30% вперёд
+      const forecastPoints = Math.ceil(n * 0.3)
+      const forecastLabels = []
+      const forecastValues = []
+      const lastDate = new Date(data[data.length - 1].timestamp)
+
+      for (let i = 1; i <= forecastPoints; i++) {
+        const forecastDate = new Date(lastDate.getTime() + i * 3600000) // +1 час
+        forecastLabels.push(
+          forecastDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ' (прогноз)'
+        )
+        forecastValues.push(slope * (n + i - 1) + intercept)
+      }
+
+      datasets.push({
+        label: 'Прогноз',
+        data: [...Array(n).fill(null), ...forecastValues],
+        borderColor: '#f97316',
+        borderDash: [3, 3],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        order: 0,
+      })
+
+      // Объединяем метки
+      labels.push(...forecastLabels)
+    }
+
+    return { labels, datasets }
+  })
+
+  // Используем обычный const (НЕ $state) чтобы убрать warning
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top' as const,
+        labels: {
+          font: { size: 9 },
+          boxWidth: 10,
+          padding: 8,
+        }
+      },
+      tooltip: {
+        mode: 'index' as const,
+        intersect: false,
+      }
+    },
+    scales: {
+      x: {
+        display: true,
+        grid: { display: false },
+        ticks: {
+          maxTicksLimit: 6,
+          font: { size: 9 },
+          callback: (value: any) => {
+            const label = chartData.labels?.[value] || ''
+            return label.includes('(прогноз)') ? '' : label.split(' ')[0]
+          }
+        }
+      },
+      y: {
+        display: true,
+        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+        ticks: {
+          font: { size: 9 },
+          callback: (value: any) => `${value} ${unit}`
+        }
+      }
+    },
+    interaction: {
+      mode: 'nearest' as const,
+      axis: 'x' as const,
+      intersect: false
+    }
+  }
+</script>
+
+<div class="w-full">
+  {#if label}
+    <div class="text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-2">{label}</div>
+  {/if}
+
+  <div class="h-[200px]">
+    {#if data.length > 0}
+      <Line data={chartData} options={chartOptions} />
+    {:else}
+      <div class="flex items-center justify-center h-full text-sm text-neutral-400">
+        Нет данных для графика
+      </div>
+    {/if}
+  </div>
+</div>
+'''
+
+chart_path.write_text(chart_content, encoding='utf-8', newline='\n')
+print('✓ TrendChart.svelte: добавлены линия тренда и экстраполяция')
+
+# ============================================================================
+# 2. AnalyticsPanel.svelte — прогнозы на 7/30/90/365 + раскрывающиеся карточки
+# ============================================================================
+panel_path = PROJECT_ROOT / 'frontend/src/components/analytics/AnalyticsPanel.svelte'
+panel_content = '''<script lang="ts">
   import { onMount } from 'svelte'
   import api from '../../lib/api'
   import TrendChart from './TrendChart.svelte'
@@ -106,8 +308,8 @@
     translated = translated.replace(/Avg ([0-9.]+) outside optimal range/g, 'Среднее $1 вне оптимального диапазона')
     translated = translated.replace(/([0-9.]+)% broken sensors/g, '$1% битых датчиков')
     translated = translated.replace(/([0-9.]+)% anomalies/g, '$1% аномалий')
-    translated = translated.replace(/Rising ([0-9.]+)\/day/g, 'Рост $1/день')
-    translated = translated.replace(/Falling (-?[0-9.]+)\/day/g, 'Падение $1/день')
+    translated = translated.replace(/Rising ([0-9.]+)\\/day/g, 'Рост $1/день')
+    translated = translated.replace(/Falling (-?[0-9.]+)\\/day/g, 'Падение $1/день')
     translated = translated.replace(/reaches CRITICAL in ([0-9]+) days/g, 'достигнет КРИТИЧЕСКОГО уровня через $1 дней')
     return translated
   }
@@ -294,7 +496,7 @@
                       <ul class="ml-4 list-disc text-[11px]">
                         <li>Период анализа: {period} дней</li>
                         <li>Точек данных: {data.trends[Object.keys(data.trends)[0]]?.bucket_count || 'N/A'}</li>
-                        <li>Агрегация: {data?.aggregation || 'auto'}</li>
+                        <li>Агрегация: {data.aggregation}</li>
                       </ul>
                     </div>
                   </div>
@@ -349,3 +551,56 @@
     {/if}
   </div>
 </div>
+'''
+
+panel_path.write_text(panel_content, encoding='utf-8', newline='\n')
+print('✓ AnalyticsPanel.svelte: прогнозы 7/30/90/365 + раскрывающиеся карточки')
+
+# ============================================================================
+# 3. Backend: увеличиваем лимит рекомендаций до 5
+# ============================================================================
+analyzer_path = PROJECT_ROOT / 'backend/modules/analytics/llm/analyzer.py'
+if analyzer_path.exists():
+    content = analyzer_path.read_text(encoding='utf-8')
+    # Меняем [:3] на [:5] в fallback
+    if 'for issue in top_issues[:3]:' in content:
+        content = content.replace('for issue in top_issues[:3]:', 'for issue in top_issues[:5]:')
+        analyzer_path.write_text(content, encoding='utf-8', newline='\n')
+        print('✓ analyzer.py: увеличен лимит рекомендаций до 5')
+
+print()
+print('=' * 60)
+print('ЧТО ДОБАВЛЕНО:')
+print('=' * 60)
+print()
+print('1. Линия тренда + экстраполяция (TrendChart.svelte):')
+print('   • Пунктирная серая линия "Тренд" (линейная регрессия)')
+print('   • Оранжевая пунктирная линия "Прогноз" (экстраполяция на 30% вперёд)')
+print('   • Legend с подписями: Данные / Тренд / Прогноз')
+print('   • Прогнозные метки помечены "(прогноз)" и не загромождают ось')
+print()
+print('2. Прогнозы на 7/30/90/365 дней (AnalyticsPanel.svelte):')
+print('   • Переключатель периодов в вкладке "Прогноз"')
+print('   • Для 7/30 дней — использует LLM forecast')
+print('   • Для 90/365 дней — экстраполяция на основе трендов')
+print('   • Оценка риска с пояснением')
+print()
+print('3. Раскрывающиеся карточки рекомендаций:')
+print('   • Клик → раскрывается блок с деталями')
+print('   • Показывает: как рассчитан эффект, какие данные использовались')
+print('   • Лимит увеличен до 5 рекомендаций')
+print()
+print('4. Раскрывающиеся карточки проблем:')
+print('   • Клик → раскрывается блок с компонентами impact')
+print('   • Показывает: deviation, trend, anomalies, outliers')
+print('   • Показывает нормы параметра (opt_min/max, crit_min/max)')
+print()
+print('Frontend перезагрузится автоматически (Vite HMR).')
+print('Backend перезагрузится автоматически (hot-reload).')
+print()
+print('Проверка:')
+print('  1. В чате: "покажи аналитику"')
+print('  2. Вкладка "Тренды": графики с линией тренда и прогнозом')
+print('  3. Вкладка "Прогноз": переключатель 7/30/90/365 дней')
+print('  4. Вкладка "Проблемы": клик на карточку → раскрываются детали')
+print('  5. Вкладка "Рекомендации": клик на карточку → раскрываются детали')

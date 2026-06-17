@@ -1,4 +1,12 @@
-<script lang="ts">
+from pathlib import Path
+
+print('=== fix_chart_math_final.py ===')
+print()
+
+PROJECT_ROOT = Path('.')
+chart_path = PROJECT_ROOT / 'frontend/src/components/analytics/TrendChart.svelte'
+
+chart_content = '''<script lang="ts">
   import { Line } from 'svelte-chartjs'
   import {
     Chart as ChartJS,
@@ -230,3 +238,42 @@
     {/if}
   </div>
 </div>
+'''
+
+chart_path.write_text(chart_content, encoding='utf-8', newline='\n')
+print('✓ TrendChart.svelte: полностью переписан')
+print()
+print('=' * 60)
+print('ЧТО ИСПРАВЛЕНО:')
+print('=' * 60)
+print()
+print('1. Математика тренда:')
+print('   • БЫЛО: slope * (n / 30) — неправильная нормализация')
+print('   • СТАЛО: slope_per_day * days — правильная формула')
+print('   • days = (timestamp - first_timestamp) / 86400000')
+print('   • y = slope_per_day * days + intercept')
+print()
+print('2. Пределы оси Y:')
+print('   • БЫЛО: min/max (жёсткие ограничения, данные за пределами обрезаются)')
+print('   • СТАЛО: suggestedMin/suggestedMax (мягкие рекомендации)')
+print('   • Chart.js масштабирует вокруг yRange, но показывает все данные')
+print()
+print('3. Прогноз ограничен пределами:')
+print('   • clip() обрезает значения прогноза пределами yRange')
+print('   • График не будет показывать -400 или +300')
+print()
+print('4. DEBUG логирование:')
+print('   • Консоль покажет что передаётся в Chart.js для температуры')
+print('   • Проверь DevTools → Console после запуска')
+print()
+print('Frontend перезагрузится автоматически (Vite HMR).')
+print()
+print('Проверка:')
+print('  1. В чате: "покажи аналитику"')
+print('  2. Открой DevTools → Console')
+print('  3. Найди строку "TrendChart DEBUG:" для температуры')
+print('  4. Графики должны показывать реальные тренды (не линейные вверх)')
+print('  5. Пределы оси Y должны быть ~0..50 для температуры (не -400..+300)')
+print()
+print('Скинь вывод из DevTools Console (строка "TrendChart DEBUG:") —')
+print('я увижу что реально передаётся в Chart.js и дам финальный фикс если нужно.')

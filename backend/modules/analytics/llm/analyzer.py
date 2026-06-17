@@ -230,7 +230,7 @@ class AnalyticsLLM:
         
         # Рекомендации из топ проблем (простые шаблоны)
         recommendations = []
-        for issue in top_issues[:3]:
+        for issue in top_issues[:5]:
             param = issue["param"]
             if "broken sensors" in issue.get("reason", ""):
                 recommendations.append({

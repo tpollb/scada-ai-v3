@@ -177,6 +177,7 @@ def analyze_param_trend(param_data: dict) -> dict:
         "direction": direction,
         "anomalies": anomalies,
         "anomaly_rate": round(anomaly_rate, 4),
+        "norms": param_data.get("norms", {}),
         "raw_data": raw_data,
     }
 
