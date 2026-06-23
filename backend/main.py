@@ -1,4 +1,4 @@
-"""SCADA.AI v3.2.0 — Main application"""
+"""SCADA.AI v3.2.1 — Main application"""
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -138,7 +138,7 @@ async def debug_routes():
 # ============================================================================
 # Подключаем роутеры
 # ============================================================================
-from api.routes import chat, config, health, system, docs, energy, analytics  # noqa: E402
+from api.routes import chat, config, health, system, docs, energy, analytics, deep_analysis  # noqa: E402
 
 app.include_router(chat.router, tags=["chat"])
 app.include_router(config.router, tags=["config"])
@@ -147,6 +147,10 @@ app.include_router(system.router)
 app.include_router(docs.router)
 app.include_router(energy.router)
 app.include_router(analytics.router)
+app.include_router(deep_analysis.router)
+
+app.include_router(deep_analysis.router)
+
 
 log.info("All routers registered")
 

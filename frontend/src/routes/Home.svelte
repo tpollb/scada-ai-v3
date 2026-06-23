@@ -6,10 +6,12 @@
   import { theme } from '../stores/theme'
   import Input from '../components/Input.svelte'
   import SystemLogsPanel from '../components/SystemLogsPanel.svelte'
+  import DeepAnalysisControls from '../components/DeepAnalysisControls.svelte'
+  import DeepAnalysisResults from '../components/DeepAnalysisResults.svelte'
   import NarrativePanel from '../components/NarrativePanel.svelte'
   import WidgetRouter from '../components/WidgetRouter.svelte'
   import api from '../lib/api'
-  import { Settings, Volume2, Database, Cpu, Zap, Clock, CheckCircle, XCircle, AlertCircle, Sun, Moon, Terminal, Wrench, Package, ChevronDown, ChevronUp } from 'lucide-svelte'
+  import { Settings, Volume2, Database, Cpu, Zap, Clock, CheckCircle, XCircle, AlertCircle, Sun, Moon, Terminal, Wrench, Package, ChevronDown, ChevronUp , Activity } from 'lucide-svelte'
 
   interface SystemInfo {
     app_name: string
@@ -34,16 +36,62 @@
   let lastVoiceText = $state<string | null>(null)
   let systemInfo = $state<SystemInfo | null>(null)
   let showLogsPanel = $state(false)
+  let showDeepAnalysisPanel = $state(false)
+  let ddaTags = $state<any[]>([])
+  let ddaSelectedTag = $state<string>('')
+  let ddaPeriod = $state<number>(30)
+  let ddaIsAnalyzing = $state(false)
+  let ddaAnalysisResult = $state<any>(null)
+  let ddaError = $state<string | null>(null)
 
   onMount(async () => {
     try { health = await getHealth() } catch (e) { console.error('Failed to fetch health:', e) }
     try { systemInfo = await api.get('system/info').json<SystemInfo>() } catch (e) { console.error('Failed to fetch system info:', e) }
   })
 
-  async function handleSend(message: string) {
+  
+  async function runDDAAnalysis() {
+    if (!ddaSelectedTag) {
+      ddaError = 'Выберите тег для анализа'
+      return
+    }
+
+    ddaIsAnalyzing = true
+    ddaError = null
+    ddaAnalysisResult = null
+
+    try {
+      const response = await api.post('api/v1/deep_analysis/run', {
+        json: {
+          tags: [ddaSelectedTag],
+          period: ddaPeriod,
+          anomalies: true,
+          correlations: false,
+          seasonality: false,
+          compare_periods: false,
+        }
+      }).json()
+
+      console.log('🔍 DDA Analysis response:', response)
+      ddaAnalysisResult = response
+    } catch (e: any) {
+      console.error('DDA Analysis failed:', e)
+      ddaError = e?.message || 'Ошибка анализа'
+    } finally {
+      ddaIsAnalyzing = false
+    }
+  }
+
+async function handleSend(message: string) {
     const lower = message.toLowerCase()
     if (lower.includes('логи') || lower.includes('log')) {
       showLogsPanel = true
+      return
+    }
+
+    // Deep Analysis trigger
+    if (lower.includes('глубокий анализ') || lower.includes('deep analysis') || lower.includes('проанализируй тег')) {
+      showDeepAnalysisPanel = true
       return
     }
     
@@ -146,13 +194,31 @@
     caps.push({ text: 'открой конфигуратор', category: 'Настройки', action: 'config' })
     return caps
   })
+
+  // Загружаем теги для Deep Analysis при открытии панели
+  $effect(() => {
+    if (showDeepAnalysisPanel && ddaTags.length === 0) {
+      console.log('🔄 Loading DDA tags...')
+      api.get('api/v1/deep_analysis/tags').json().then((tags: any[]) => {
+        console.log('✓ DDA tags loaded:', tags.length)
+        ddaTags = tags
+        if (tags.length > 0 && !ddaSelectedTag) {
+          ddaSelectedTag = tags[0].tag_name
+        }
+      }).catch((e: any) => {
+        console.error('Failed to fetch DDA tags:', e)
+        ddaError = 'Не удалось загрузить список тегов'
+      })
+    }
+  })
+
 </script>
 
 <div class="flex flex-col h-screen bg-neutral-50 dark:bg-neutral-900 transition-colors">
   <header class="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors">
     <div class="flex items-center gap-3">
       <h1 class="text-base font-mono text-neutral-500 dark:text-neutral-400 tracking-tight">
-        SCADA.AI <span class="text-neutral-400 dark:text-neutral-500">v3.2.0</span>
+        SCADA.AI <span class="text-neutral-400 dark:text-neutral-500">v3.2.1</span>
       </h1>
     </div>
     <div class="flex items-center gap-2">
@@ -169,6 +235,15 @@
       >
         <Terminal size={18} />
       </button>
+      <button
+        type="button"
+        onclick={() => showDeepAnalysisPanel = !showDeepAnalysisPanel}
+        class="p-2 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 transition text-neutral-700 dark:text-neutral-300"
+        title={showDeepAnalysisPanel ? 'Скрыть анализ' : 'Deep Analysis'}
+      >
+        <Activity size={18} />
+      </button>
+
       <button 
         type="button" 
         onclick={() => theme.toggle()} 
@@ -195,7 +270,27 @@
     {#if showLogsPanel}
       <SystemLogsPanel onClose={() => showLogsPanel = false} />
     {/if}
+    {#if showDeepAnalysisPanel}
+      <DeepAnalysisControls
+        tags={ddaTags}
+        selectedTag={ddaSelectedTag}
+        period={ddaPeriod}
+        isAnalyzing={ddaIsAnalyzing}
+        error={ddaError}
+        onTagChange={(tag) => ddaSelectedTag = tag}
+        onPeriodChange={(period) => ddaPeriod = period}
+        onRunAnalysis={runDDAAnalysis}
+        onClose={() => showDeepAnalysisPanel = false}
+      />
+    {/if}
     <div class="flex-1 flex flex-col bg-white dark:bg-neutral-900 overflow-hidden transition-colors">
+      {#if showDeepAnalysisPanel}
+        <DeepAnalysisResults
+          analysisResult={ddaAnalysisResult}
+          isAnalyzing={ddaIsAnalyzing}
+        />
+      {:else}
+
       <div class="flex-1 overflow-y-auto">
         <NarrativePanel />
       </div>
@@ -203,6 +298,7 @@
         <WidgetRouter widgets={currentWidgets} onClose={handleCloseWidgets} />
       {/if}
       <Input onSend={handleSend} />
+    {/if}
     </div>
     
     <aside class="w-80 border-l border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 hidden lg:flex lg:flex-col flex-shrink-0 overflow-y-auto transition-colors">

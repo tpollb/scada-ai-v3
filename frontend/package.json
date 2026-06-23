@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "3.2.0",
+  "version": "3.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,6 +24,7 @@
     "chart.js": "^4.5.1",
     "chartjs-plugin-zoom": "^2.2.0",
     "cmdk-sv": "^0.0.19",
+    "hammerjs": "^2.0.8",
     "ky": "^2.0.2",
     "lucide-svelte": "^1.0.1",
     "marked": "^18.0.5",

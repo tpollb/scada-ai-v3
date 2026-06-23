@@ -1,0 +1,37 @@
+name: deep_analysis
+version: 0.1.0
+description: Глубокий анализ тегов — статистика, аномалии, корреляции, сезонность
+enabled: true
+
+# Доступные периоды для анализа
+available_periods: [7, 30, 120, 365]
+
+# Опции анализа (можно включать/выключать)
+analysis_options:
+  anomalies: true        # Isolation Forest + K-Means
+  correlations: true     # Pearson + Mutual Information + Granger
+  seasonality: true      # FFT для циклов
+  compare_periods: true  # A/B сравнение
+
+# Форматы экспорта
+export_formats:
+  - pdf
+  - excel
+  - csv
+
+# Папка для хранения истории анализов
+history_dir: "data/analysis_history"
+
+# Максимальное количество точек для анализа (downsampling)
+max_points: 50000
+
+# Параметры для Isolation Forest
+isolation_forest:
+  contamination: 0.05    # предполагаемый % аномалий
+  n_estimators: 100      # количество деревьев
+
+# Параметры для FFT
+fft:
+  min_period_hours: 1    # минимальный период для детекции
+  max_period_hours: 168  # максимальный период (неделя)
+  significance_threshold: 0.1  # порог значимости пика
