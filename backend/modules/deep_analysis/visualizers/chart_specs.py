@@ -1,5 +1,6 @@
 """Генерация JSON-спецификаций для Chart.js"""
 from typing import Optional
+import numpy as np
 from datetime import datetime
 from structlog import get_logger
 
@@ -145,6 +146,175 @@ def create_histogram_spec(
                 },
             },
         },
+    }
+    
+    return spec
+
+
+def create_heatmap_spec(
+    correlation_matrix: dict,
+    title: str = "Матрица корреляций"
+) -> dict:
+    """
+    Создаёт JSON-спецификацию для heatmap (матрица корреляций).
+    
+    Args:
+        correlation_matrix: результат от compute_correlation_matrix()
+        title: заголовок графика
+    
+    Returns:
+        Chart.js конфигурация для heatmap
+    """
+    tags = correlation_matrix['tags']
+    matrix = correlation_matrix['matrix']
+    
+    # Форматируем данные для Chart.js heatmap
+    # Chart.js не имеет встроенного heatmap, поэтому используем scatter с цветами
+    datasets = []
+    
+    for i, tag1 in enumerate(tags):
+        for j, tag2 in enumerate(tags):
+            value = matrix[i][j]
+            # Цвет: красный (отрицательная) → белый (ноль) → синий (положительная)
+            if value >= 0:
+                color = f"rgba(59, 130, 246, {abs(value)})"  # синий
+            else:
+                color = f"rgba(239, 68, 68, {abs(value)})"  # красный
+            
+            datasets.append({
+                "x": j,
+                "y": i,
+                "v": value,
+                "r": abs(value) * 20 + 5,  # размер точки
+                "backgroundColor": color,
+            })
+    
+    spec = {
+        "type": "bubble",
+        "data": {
+            "datasets": [{
+                "label": title,
+                "data": datasets,
+                "backgroundColor": [d["backgroundColor"] for d in datasets],
+            }]
+        },
+        "options": {
+            "responsive": True,
+            "maintainAspectRatio": False,
+            "plugins": {
+                "legend": {"display": False},
+                "tooltip": {
+                    "callbacks": {
+                        "label": f"function(context) {{ return '{tags[0]}: ' + context.raw.v.toFixed(2); }}"
+                    }
+                }
+            },
+            "scales": {
+                "x": {
+                    "type": "linear",
+                    "min": -0.5,
+                    "max": len(tags) - 0.5,
+                    "ticks": {
+                        "callback": f"function(value) {{ return {tags}[value] || ''; }}",
+                        "stepSize": 1,
+                    },
+                    "title": {"display": False},
+                },
+                "y": {
+                    "type": "linear",
+                    "min": -0.5,
+                    "max": len(tags) - 0.5,
+                    "ticks": {
+                        "callback": f"function(value) {{ return {tags}[value] || ''; }}",
+                        "stepSize": 1,
+                    },
+                    "title": {"display": False},
+                }
+            }
+        }
+    }
+    
+    return spec
+
+
+def create_scatter_spec(
+    x_values: list[float],
+    y_values: list[float],
+    tag_x: str,
+    tag_y: str,
+    correlation_coef: float,
+) -> dict:
+    """
+    Создаёт JSON-спецификацию для scatter plot (пара тегов).
+    
+    Returns:
+        Chart.js конфигурация для scatter plot с линией регрессии
+    """
+    # Точки данных
+    points = [{"x": x, "y": y} for x, y in zip(x_values, y_values)]
+    
+    # Линия регрессии (линейная)
+    if len(x_values) > 1:
+        x_arr = np.array(x_values)
+        y_arr = np.array(y_values)
+        slope, intercept = np.polyfit(x_arr, y_arr, 1)
+        
+        # Две точки для линии регрессии
+        x_min, x_max = float(np.min(x_arr)), float(np.max(x_arr))
+        regression_line = [
+            {"x": x_min, "y": slope * x_min + intercept},
+            {"x": x_max, "y": slope * x_max + intercept},
+        ]
+    else:
+        regression_line = []
+    
+    spec = {
+        "type": "scatter",
+        "data": {
+            "datasets": [
+                {
+                    "label": f"{tag_x} vs {tag_y}",
+                    "data": points,
+                    "backgroundColor": "rgba(59, 130, 246, 0.5)",
+                    "borderColor": "rgba(59, 130, 246, 1)",
+                    "pointRadius": 3,
+                },
+                {
+                    "label": f"Регрессия (r={correlation_coef:.2f})",
+                    "data": regression_line,
+                    "type": "line",
+                    "borderColor": "rgba(239, 68, 68, 1)",
+                    "borderWidth": 2,
+                    "borderDash": [5, 5],
+                    "pointRadius": 0,
+                    "fill": False,
+                }
+            ]
+        },
+        "options": {
+            "responsive": True,
+            "maintainAspectRatio": False,
+            "plugins": {
+                "legend": {
+                    "display": True,
+                    "position": "top",
+                },
+                "tooltip": {
+                    "mode": "nearest",
+                    "intersect": True,
+                }
+            },
+            "scales": {
+                "x": {
+                    "type": "linear",
+                    "title": {"display": True, "text": tag_x},
+                },
+                "y": {
+                    "type": "linear",
+                    "title": {"display": True, "text": tag_y},
+                }
+            }
+        }
     }
     
     return spec

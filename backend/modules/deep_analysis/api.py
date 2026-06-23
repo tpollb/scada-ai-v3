@@ -10,7 +10,8 @@ from modules.deep_analysis.collectors.data_fetcher import fetch_tag_data, fetch_
 from modules.deep_analysis.collectors.tag_resolver import get_available_tags
 from modules.deep_analysis.analyzers.stats import compute_basic_stats, compute_histogram
 from modules.deep_analysis.analyzers.anomalies import detect_anomalies_isolation_forest
-from modules.deep_analysis.visualizers.chart_specs import create_time_series_spec, create_histogram_spec
+from modules.deep_analysis.analyzers.correlations import compute_correlation_matrix, compute_pair_correlation
+from modules.deep_analysis.visualizers.chart_specs import create_time_series_spec, create_histogram_spec, create_heatmap_spec, create_scatter_spec
 from modules.deep_analysis.history.storage import save_analysis, load_analysis, list_analyses, generate_analysis_id
 
 log = get_logger()
@@ -33,6 +34,28 @@ class AnalysisRequest(BaseModel):
     compare_periods: bool = Field(False, description="Сравнение с предыдущим периодом")
 
 
+
+
+class PairAnalysisRequest(BaseModel):
+    """Запрос анализа конкретной пары тегов"""
+    tag1: str = Field(..., description="Первый тег")
+    tag2: str = Field(..., description="Второй тег")
+    period: int = Field(30, description="Период в днях", ge=1, le=365)
+
+
+class PairAnalysisResponse(BaseModel):
+    """Ответ с детальным анализом пары"""
+    tag1: str
+    tag2: str
+    period: str
+    pearson: dict
+    spearman: dict
+    mutual_info: dict
+    cross_correlation: dict
+    scatter_data: dict
+    scatter_spec: dict
+
+
 class AnalysisResponse(BaseModel):
     """Ответ с результатами анализа"""
     analysis_id: str
@@ -41,13 +64,12 @@ class AnalysisResponse(BaseModel):
     tags: list[str]
     period: str
     summary: str
-    statistics: dict
-    anomalies: Optional[dict]
-    correlations: Optional[dict]
-    seasonality: Optional[dict]
+    statistics: Optional[dict] = None  # None для мульти-тег анализа
+    anomalies: Optional[dict] = None   # None для мульти-тег анализа
+    correlations: Optional[dict] = None
+    seasonality: Optional[dict] = None
     visualizations: dict
     history_path: str
-
 
 class TagInfo(BaseModel):
     """Информация о теге"""
@@ -160,12 +182,81 @@ async def run_analysis(request: AnalysisRequest):
             summary = " ".join(summary_parts)
         
         else:
-            # Группа тегов — кросс-анализ (упрощённо для Итерации 1)
-            # TODO: полная реализация в Итерации 2
-            raise HTTPException(
-                status_code=501,
-                detail="Multi-tag analysis will be implemented in Iteration 2"
+            # Группа тегов — кросс-анализ (корреляции)
+            log.info("Multi-tag analysis", tags=request.tags)
+            
+            # Сбор данных с выравниванием
+            data = await fetch_multiple_tags(
+                request.tags, start_date, end_date,
+                resample_freq='5min',
+                align=True
             )
+            
+            if not data['common_timestamps']:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No common timestamps found for correlation analysis. "
+                           "Tags may have insufficient data or non-overlapping time ranges."
+                )
+            
+            # Матрица корреляций
+            correlation_matrix = compute_correlation_matrix(
+                data['tags'],
+                data['common_timestamps'],
+                method='pearson'
+            )
+            
+            # Детальный анализ для первой пары (как пример)
+            if len(request.tags) >= 2:
+                tag1, tag2 = request.tags[0], request.tags[1]
+                pair_analysis = compute_pair_correlation(
+                    data['tags'][tag1].get('aligned_values', []),
+                    data['tags'][tag2].get('aligned_values', []),
+                    tag1, tag2
+                )
+            else:
+                pair_analysis = None
+            
+            # Визуализации
+            heatmap_spec = create_heatmap_spec(correlation_matrix)
+            scatter_spec = None
+            if pair_analysis and pair_analysis['scatter_data']['x']:
+                scatter_spec = create_scatter_spec(
+                    pair_analysis['scatter_data']['x'],
+                    pair_analysis['scatter_data']['y'],
+                    pair_analysis['tag_x'],
+                    pair_analysis['tag_y'],
+                    pair_analysis['pearson']['coefficient']
+                )
+            
+            # Формируем результаты
+            results = {
+                "correlation_matrix": correlation_matrix,
+                "pair_analysis": pair_analysis,
+            }
+            
+            # Summary
+            summary_parts = [
+                f"Анализ {len(request.tags)} тегов за период {period_str}.",
+                f"Общих точек: {len(data['common_timestamps'])}.",
+            ]
+            
+            # Находим самую сильную корреляцию
+            max_corr = 0.0
+            max_pair = None
+            for i in range(len(correlation_matrix['tags'])):
+                for j in range(i + 1, len(correlation_matrix['tags'])):
+                    corr = correlation_matrix['matrix'][i][j]
+                    if abs(corr) > abs(max_corr):
+                        max_corr = corr
+                        max_pair = (correlation_matrix['tags'][i], correlation_matrix['tags'][j])
+            
+            if max_pair:
+                summary_parts.append(
+                    f"Самая сильная корреляция: {max_pair[0]} ↔ {max_pair[1]} (r={max_corr:.2f})"
+                )
+            
+            summary = " ".join(summary_parts)
         
         # Генерируем ID и сохраняем
         analysis_id = generate_analysis_id(request.tags, period_str)
@@ -185,23 +276,44 @@ async def run_analysis(request: AnalysisRequest):
         history_path = save_analysis(analysis_id, params, results)
         
         # Формируем ответ
-        response = AnalysisResponse(
-            analysis_id=analysis_id,
-            status="completed",
-            created_at=datetime.now().isoformat(),
-            tags=request.tags,
-            period=period_str,
-            summary=summary,
-            statistics=stats,
-            anomalies=anomalies_result,
-            correlations=None,  # TODO: Итерация 2
-            seasonality=None,   # TODO: Итерация 2
-            visualizations={
-                "time_series": time_series_spec,
-                "histogram": histogram_spec,
-            },
-            history_path=history_path,
-        )
+        if len(request.tags) == 1:
+            # Один тег
+            response = AnalysisResponse(
+                analysis_id=analysis_id,
+                status="completed",
+                created_at=datetime.now().isoformat(),
+                tags=request.tags,
+                period=period_str,
+                summary=summary,
+                statistics=stats,
+                anomalies=anomalies_result,
+                correlations=None,
+                seasonality=None,
+                visualizations={
+                    "time_series": time_series_spec,
+                    "histogram": histogram_spec,
+                },
+                history_path=history_path,
+            )
+        else:
+            # Мульти-тег
+            response = AnalysisResponse(
+                analysis_id=analysis_id,
+                status="completed",
+                created_at=datetime.now().isoformat(),
+                tags=request.tags,
+                period=period_str,
+                summary=summary,
+                statistics=None,  # для мульти-тега статистика по каждому тегу отдельно
+                anomalies=None,
+                correlations=results.get('correlation_matrix'),
+                seasonality=None,
+                visualizations={
+                    "heatmap": heatmap_spec,
+                    "scatter": scatter_spec,
+                },
+                history_path=history_path,
+            )
         
         log.info("Analysis completed", id=analysis_id, summary=summary[:100])
         return response
@@ -212,6 +324,74 @@ async def run_analysis(request: AnalysisRequest):
         tb = traceback.format_exc()
         log.error("Analysis failed", error=str(e), tags=request.tags, traceback=tb)
         raise HTTPException(status_code=500, detail=f"Analysis failed: {type(e).__name__}: {str(e)}")
+
+
+
+
+@router.post("/pair", response_model=PairAnalysisResponse)
+async def analyze_pair(request: PairAnalysisRequest):
+    """
+    Детальный анализ конкретной пары тегов.
+    Используется при клике на ячейку в heatmap.
+    """
+    log.info(
+        "Analyzing pair",
+        tag1=request.tag1,
+        tag2=request.tag2,
+        period=request.period
+    )
+    
+    try:
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=request.period)
+        period_str = f"{request.period} days"
+        
+        # Собираем данные с выравниванием
+        data = await fetch_multiple_tags(
+            [request.tag1, request.tag2],
+            start_date, end_date,
+            resample_freq='5min',
+            align=True
+        )
+        
+        if not data['common_timestamps']:
+            raise HTTPException(
+                status_code=400,
+                detail="No common data for pair analysis"
+            )
+        
+        # Детальный анализ пары
+        pair_analysis = compute_pair_correlation(
+            data['tags'][request.tag1].get('aligned_values', []),
+            data['tags'][request.tag2].get('aligned_values', []),
+            request.tag1, request.tag2
+        )
+        
+        # Scatter spec
+        scatter_spec = create_scatter_spec(
+            pair_analysis['scatter_data']['x'],
+            pair_analysis['scatter_data']['y'],
+            request.tag1, request.tag2,
+            pair_analysis['pearson']['coefficient']
+        )
+        
+        return PairAnalysisResponse(
+            tag1=request.tag1,
+            tag2=request.tag2,
+            period=period_str,
+            pearson=pair_analysis['pearson'],
+            spearman=pair_analysis['spearman'],
+            mutual_info=pair_analysis['mutual_info'],
+            cross_correlation=pair_analysis['cross_correlation'],
+            scatter_data=pair_analysis['scatter_data'],
+            scatter_spec=scatter_spec,
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Pair analysis failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/tags", response_model=list[TagInfo])

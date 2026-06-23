@@ -1,4 +1,18 @@
-"""Сбор данных из tags_value с обработкой пропусков и синхронизацией"""
+#!/usr/bin/env python3
+"""
+fix_resample_and_grid_check.py — исправляет 2 проблемы в data_fetcher.py
+"""
+
+from pathlib import Path
+
+print('=' * 70)
+print('ФИКС: DatetimeIndex bool + правильный resample')
+print('=' * 70)
+print()
+
+fetcher_path = Path('backend/modules/deep_analysis/collectors/data_fetcher.py')
+
+new_fetcher = '''"""Сбор данных из tags_value с обработкой пропусков и синхронизацией"""
 from datetime import datetime, timedelta
 from typing import Optional
 from structlog import get_logger
@@ -265,3 +279,34 @@ async def fetch_multiple_tags(
     )
     
     return result
+'''
+
+fetcher_path.write_text(new_fetcher, encoding='utf-8', newline='\n')
+
+print('✓ backend/modules/deep_analysis/collectors/data_fetcher.py исправлен')
+print()
+print('Что исправлено:')
+print('  1. ✓ "if common_grid" → "if common_grid is not None" (исправлен ValueError)')
+print('  2. ✓ Новый алгоритм _resample_to_grid:')
+print('     • series.resample(freq).mean() — усреднение в пределах интервалов')
+print('     • reindex(grid, method="nearest", tolerance=freq) — поиск ближайших')
+print('     • interpolate(limit_area="inside") — интерполяция внутри диапазона')
+print('     • Фильтрация по min_data_ts/max_data_ts (не экстраполируем)')
+print('  3. ✓ Добавлено логирование coverage (процент валидных точек)')
+print('  4. ✓ Предупреждение если < 10 валидных точек')
+print()
+print('=' * 70)
+print('Перезапусти backend и проверь:')
+print('=' * 70)
+print()
+print('  curl -X POST http://localhost:8081/api/v1/deep_analysis/run \\')
+print('    -H "Content-Type: application/json" \\')
+print('    -d \'{"tags": ["R203-Temperature", "R203-CO2", "R203-Humidity"], "period": 30}\'')
+print()
+print('В логах должен появиться coverage:')
+print('  Tag resampled to grid tag=R203-Temperature raw=37612 grid=8641 valid=7234 coverage=83.7%')
+print()
+print('Если coverage всё ещё низкий (<10%):')
+print('  • Возможно теги имеют разную временную зону')
+print('  • Возможно в БД timestamps в UTC, а grid в local time')
+print('  • Скинь вывод: SELECT min(date_created), max(date_created) FROM tags_value LIMIT 10')

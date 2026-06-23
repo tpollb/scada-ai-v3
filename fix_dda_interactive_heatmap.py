@@ -1,4 +1,146 @@
-<script lang="ts">
+#!/usr/bin/env python3
+"""
+fix_dda_interactive_heatmap.py — интерактивный heatmap с кликом по ячейкам
+"""
+
+from pathlib import Path
+
+print('=' * 70)
+print('ИНТЕРАКТИВНЫЙ HEATMAP + ENDPOINT ДЛЯ ПАРЫ')
+print('=' * 70)
+print()
+
+# ============================================================================
+# 1. Добавляем endpoint /deep_analysis/pair в api.py
+# ============================================================================
+api_path = Path('backend/modules/deep_analysis/api.py')
+content = api_path.read_text(encoding='utf-8')
+
+# Импортируем compute_pair_correlation (уже должен быть импортирован)
+if 'compute_pair_correlation' not in content:
+    content = content.replace(
+        'from modules.deep_analysis.analyzers.correlations import compute_correlation_matrix',
+        'from modules.deep_analysis.analyzers.correlations import compute_correlation_matrix, compute_pair_correlation'
+    )
+
+# Добавляем Pydantic модель для запроса пары
+pair_models = '''
+
+class PairAnalysisRequest(BaseModel):
+    """Запрос анализа конкретной пары тегов"""
+    tag1: str = Field(..., description="Первый тег")
+    tag2: str = Field(..., description="Второй тег")
+    period: int = Field(30, description="Период в днях", ge=1, le=365)
+
+
+class PairAnalysisResponse(BaseModel):
+    """Ответ с детальным анализом пары"""
+    tag1: str
+    tag2: str
+    period: str
+    pearson: dict
+    spearman: dict
+    mutual_info: dict
+    cross_correlation: dict
+    scatter_data: dict
+    scatter_spec: dict
+'''
+
+# Вставляем модели перед классом AnalysisResponse
+if 'class PairAnalysisRequest' not in content:
+    content = content.replace(
+        'class AnalysisResponse(BaseModel):',
+        pair_models + '\n\nclass AnalysisResponse(BaseModel):'
+    )
+    print('✓ Добавлены модели PairAnalysisRequest/Response')
+
+# Добавляем endpoint перед @router.get("/tags")
+pair_endpoint = '''
+
+@router.post("/pair", response_model=PairAnalysisResponse)
+async def analyze_pair(request: PairAnalysisRequest):
+    """
+    Детальный анализ конкретной пары тегов.
+    Используется при клике на ячейку в heatmap.
+    """
+    log.info(
+        "Analyzing pair",
+        tag1=request.tag1,
+        tag2=request.tag2,
+        period=request.period
+    )
+    
+    try:
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=request.period)
+        period_str = f"{request.period} days"
+        
+        # Собираем данные с выравниванием
+        data = await fetch_multiple_tags(
+            [request.tag1, request.tag2],
+            start_date, end_date,
+            resample_freq='5min',
+            align=True
+        )
+        
+        if not data['common_timestamps']:
+            raise HTTPException(
+                status_code=400,
+                detail="No common data for pair analysis"
+            )
+        
+        # Детальный анализ пары
+        pair_analysis = compute_pair_correlation(
+            data['tags'][request.tag1].get('aligned_values', []),
+            data['tags'][request.tag2].get('aligned_values', []),
+            request.tag1, request.tag2
+        )
+        
+        # Scatter spec
+        scatter_spec = create_scatter_spec(
+            pair_analysis['scatter_data']['x'],
+            pair_analysis['scatter_data']['y'],
+            request.tag1, request.tag2,
+            pair_analysis['pearson']['coefficient']
+        )
+        
+        return PairAnalysisResponse(
+            tag1=request.tag1,
+            tag2=request.tag2,
+            period=period_str,
+            pearson=pair_analysis['pearson'],
+            spearman=pair_analysis['spearman'],
+            mutual_info=pair_analysis['mutual_info'],
+            cross_correlation=pair_analysis['cross_correlation'],
+            scatter_data=pair_analysis['scatter_data'],
+            scatter_spec=scatter_spec,
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Pair analysis failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+'''
+
+# Вставляем перед @router.get("/tags")
+if '@router.post("/pair"' not in content:
+    content = content.replace(
+        '@router.get("/tags"',
+        pair_endpoint + '\n@router.get("/tags"'
+    )
+    print('✓ Добавлен endpoint POST /deep_analysis/pair')
+
+api_path.write_text(content, encoding='utf-8', newline='\n')
+print('✓ api.py обновлён')
+
+# ============================================================================
+# 2. Обновляем DeepAnalysisResults.svelte — интерактивный heatmap
+# ============================================================================
+results_path = Path('frontend/src/components/DeepAnalysisResults.svelte')
+
+new_results = '''<script lang="ts">
   import { Line } from 'svelte-chartjs'
   import {
     Chart as ChartJS,
@@ -87,7 +229,7 @@
     
     try {
       // Извлекаем период из строки "30 days"
-      const periodMatch = analysisResult.period.match(/(\d+)/)
+      const periodMatch = analysisResult.period.match(/(\\d+)/)
       const periodDays = periodMatch ? parseInt(periodMatch[1]) : 30
       
       const response = await api.post('api/v1/deep_analysis/pair', {
@@ -714,3 +856,66 @@
     </div>
   {/if}
 </div>
+'''
+
+results_path.write_text(new_results, encoding='utf-8', newline='\n')
+print('✓ DeepAnalysisResults.svelte обновлён (интерактивный heatmap)')
+
+print()
+print('=' * 70)
+print('ЧТО СДЕЛАНО:')
+print('=' * 70)
+print()
+print('1. ✓ Новый endpoint: POST /deep_analysis/pair')
+print('   • Принимает {tag1, tag2, period}')
+print('   • Возвращает полный анализ пары + scatter_spec')
+print('   • Быстрый ответ (~1-2 сек) без пере-запуска всего анализа')
+print()
+print('2. ✓ Интерактивный heatmap')
+print('   • Клик на ячейку (i, j) → загружается scatter plot для пары')
+print('   • Диагональ (i=i) не кликабельна (это 1.0)')
+print('   • Выбранная ячейка подсвечивается синей рамкой')
+print('   • Tooltip показывает "клик для scatter plot"')
+print()
+print('3. ✓ State для выбранной пары')
+print('   • selectedPair = {tag1, tag2}')
+print('   • $effect автоматически загружает данные при смене пары')
+print('   • Loading state с спиннером поверх графика')
+print()
+print('4. ✓ Кликабельная таблица пар')
+print('   • Клик на строку в таблице → переключает на вкладку "Корреляции"')
+print('   • И загружает scatter для этой пары')
+print('   • Выбранная строка подсвечивается')
+print()
+print('5. ✓ Scatter plot с правильными метками осей')
+print('   • Ось X: "KITCHEN2-CO2" (полное имя первого тега)')
+print('   • Ось Y: "R204-CO2" (полное имя второго тега)')
+print('   • Заголовок: "(KITCHEN2-CO2 × R204-CO2)"')
+print()
+print('=' * 70)
+print('ПРОВЕРКА:')
+print('=' * 70)
+print()
+print('1. Открой фронтенд → Activity → выбери 4 тега → анализ')
+print('2. Вкладка "Корреляции":')
+print('   • Видишь матрицу 4×4')
+print('   • По умолчанию выбрана пара [0,1]')
+print('   • Снизу — scatter plot для этой пары')
+print()
+print('3. КЛИК НА ДРУГУЮ ЯЧЕЙКУ:')
+print('   • Например, клик на пересечении "KITCHEN2-VOC" × "R206-VOC"')
+print('   • Видишь спиннер "Загружаем пару..."')
+print('   • Через 1-2 сек scatter plot перерисовывается')
+print('   • В заголовке: "(KITCHEN2-VOC × R206-VOC)"')
+print('   • Оси: X = KITCHEN2-VOC, Y = R206-VOC')
+print()
+print('4. КЛИК В ТАБЛИЦЕ:')
+print('   • Перейди во вкладку "Таблица пар"')
+print('   • Клик на любую строку → авто-переключение на "Корреляции"')
+print('   • И загрузка scatter для этой пары')
+print()
+print('5. Зум на scatter:')
+print('   • Колёсико мыши → zoom')
+print('   • Shift+drag → область')
+print('   • Drag → прокрутка')
+print('   • Кнопки ZoomIn/Out/Reset/Download')

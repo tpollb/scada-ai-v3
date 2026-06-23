@@ -1,4 +1,18 @@
-<script lang="ts">
+#!/usr/bin/env python3
+"""
+fix_dda_ui_polish.py — доделываем UI для мульти-тег анализа
+"""
+
+from pathlib import Path
+
+print('=' * 70)
+print('ФИНАЛЬНАЯ ПОЛИРОВКА UI МУЛЬТИ-ТЕГ')
+print('=' * 70)
+print()
+
+results_path = Path('frontend/src/components/DeepAnalysisResults.svelte')
+
+new_results = '''<script lang="ts">
   import { Line } from 'svelte-chartjs'
   import {
     Chart as ChartJS,
@@ -15,9 +29,8 @@
   import zoomPlugin from 'chartjs-plugin-zoom'
   import { 
     TrendingUp, AlertTriangle, Activity, Download, RotateCcw, 
-    ZoomIn, ZoomOut, Grid3x3, ArrowRightLeft, Table, Info, Loader2
+    ZoomIn, ZoomOut, Grid3x3, ArrowRightLeft, Table, Info
   } from 'lucide-svelte'
-  import api from '../lib/api'
 
   ChartJS.register(
     CategoryScale, LinearScale, PointElement, LineElement,
@@ -31,7 +44,7 @@
 
   let { analysisResult, isAnalyzing }: Props = $props()
 
-  // Режим: single-tag или multi-tag
+  // Определяем режим
   let isMultiTag = $derived(
     analysisResult?.tags?.length > 1 && 
     analysisResult?.correlations !== null &&
@@ -44,79 +57,22 @@
     else activeTab = 'overview'
   })
 
-  // Chart instances
+  // Chart instances (разные для time series и scatter)
   let tsChartInstance: ChartJS | null = $state(null)
   let scatterChartInstance: ChartJS | null = $state(null)
   const tsChartId = `dda-ts-${Math.random().toString(36).slice(2, 9)}`
   const scatterChartId = `dda-scatter-${Math.random().toString(36).slice(2, 9)}`
 
-  // Данные графиков
+  // Chart.js данные
   let timeSeriesData = $derived(
     analysisResult?.visualizations?.time_series?.data || { labels: [], datasets: [] }
   )
+  let scatterData = $derived(
+    analysisResult?.visualizations?.scatter?.data || { datasets: [] }
+  )
   let correlationMatrix = $derived(analysisResult?.correlations)
 
-  // Выбранная пара тегов (для scatter plot)
-  let selectedPair = $state<{tag1: string, tag2: string} | null>(null)
-  let pairAnalysis = $state<any>(null)
-  let isLoadingPair = $state(false)
-  let pairError = $state<string | null>(null)
-
-  // Инициализация: выбираем первую пару по умолчанию
-  $effect(() => {
-    if (correlationMatrix?.tags?.length >= 2 && !selectedPair) {
-      selectedPair = {
-        tag1: correlationMatrix.tags[0],
-        tag2: correlationMatrix.tags[1]
-      }
-    }
-  })
-
-  // При смене выбранной пары — загружаем данные
-  $effect(() => {
-    if (selectedPair) {
-      loadPairAnalysis(selectedPair.tag1, selectedPair.tag2)
-    }
-  })
-
-  async function loadPairAnalysis(tag1: string, tag2: string) {
-    if (!analysisResult?.period) return
-    
-    isLoadingPair = true
-    pairError = null
-    
-    try {
-      // Извлекаем период из строки "30 days"
-      const periodMatch = analysisResult.period.match(/(\d+)/)
-      const periodDays = periodMatch ? parseInt(periodMatch[1]) : 30
-      
-      const response = await api.post('api/v1/deep_analysis/pair', {
-        json: { tag1, tag2, period: periodDays }
-      }).json()
-      
-      pairAnalysis = response
-    } catch (e: any) {
-      console.error('Failed to load pair:', e)
-      pairError = e?.message || 'Ошибка загрузки пары'
-    } finally {
-      isLoadingPair = false
-    }
-  }
-
-  function selectPair(tag1: string, tag2: string) {
-    if (tag1 === tag2) return // Не выбираем диагональ
-    selectedPair = { tag1, tag2 }
-  }
-
-  // Scatter данные (из pairAnalysis)
-  let scatterData = $derived.by(() => {
-    if (!pairAnalysis?.scatter_spec?.data) {
-      return { datasets: [] }
-    }
-    return pairAnalysis.scatter_spec.data
-  })
-
-  // Downsampling scatter
+  // Downsample scatter данных (чтобы не было "синей мешанины")
   let downsampledScatterData = $derived.by(() => {
     if (!scatterData.datasets || scatterData.datasets.length === 0) {
       return scatterData
@@ -125,9 +81,8 @@
     const MAX_POINTS = 800
     return {
       datasets: scatterData.datasets.map((ds: any) => {
-        if (ds.type === 'line') return ds // Регрессию не даунсемплим
-        
         if (!Array.isArray(ds.data) || ds.data.length <= MAX_POINTS) {
+          // Не даунсемплим, но добавляем alpha
           return {
             ...ds,
             backgroundColor: 'rgba(59, 130, 246, 0.35)',
@@ -136,7 +91,7 @@
             pointHoverRadius: 5,
           }
         }
-        
+        // Случайная выборка
         const indices: number[] = []
         const step = ds.data.length / MAX_POINTS
         for (let i = 0; i < MAX_POINTS; i++) {
@@ -177,7 +132,7 @@
     interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false }
   }
 
-  const scatterOptions = $derived.by(() => ({
+  const scatterOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -187,8 +142,8 @@
         intersect: true,
         callbacks: {
           label: (ctx: any) => {
-            const tagX = pairAnalysis?.tag1 || 'X'
-            const tagY = pairAnalysis?.tag2 || 'Y'
+            const tagX = analysisResult?.pair_analysis?.tag_x || 'X'
+            const tagY = analysisResult?.pair_analysis?.tag_y || 'Y'
             return `${tagX}: ${ctx.parsed.x.toFixed(2)}, ${tagY}: ${ctx.parsed.y.toFixed(2)}`
           }
         }
@@ -206,18 +161,19 @@
     scales: {
       x: { 
         type: 'linear' as const, 
-        title: { display: true, text: pairAnalysis?.tag1 || '' },
+        title: { display: true, text: analysisResult?.pair_analysis?.tag_x || '' },
         grid: { color: 'rgba(0, 0, 0, 0.05)' }
       },
       y: { 
         type: 'linear' as const, 
-        title: { display: true, text: pairAnalysis?.tag2 || '' },
+        title: { display: true, text: analysisResult?.pair_analysis?.tag_y || '' },
         grid: { color: 'rgba(0, 0, 0, 0.05)' }
       }
     }
-  }))
+  }
 
   $effect(() => {
+    // Time series chart
     if (timeSeriesData.labels.length > 0) {
       setTimeout(() => {
         const container = document.getElementById(tsChartId)
@@ -227,9 +183,7 @@
         }
       }, 200)
     }
-  })
-
-  $effect(() => {
+    // Scatter chart
     if (downsampledScatterData.datasets?.length > 0) {
       setTimeout(() => {
         const container = document.getElementById(scatterChartId)
@@ -244,6 +198,7 @@
   function resetZoomTs() { tsChartInstance?.resetZoom() }
   function zoomInTs() { tsChartInstance?.zoom(1.2) }
   function zoomOutTs() { tsChartInstance?.zoom(0.8) }
+  
   function resetZoomScatter() { scatterChartInstance?.resetZoom() }
   function zoomInScatter() { scatterChartInstance?.zoom(1.2) }
   function zoomOutScatter() { scatterChartInstance?.zoom(0.8) }
@@ -274,15 +229,10 @@
     }
   }
 
+  // Сокращение длинных имен тегов для заголовков (но tooltip показывает полное имя)
   function shortenTagName(name: string, maxLen: number = 25): string {
     if (name.length <= maxLen) return name
     return name.slice(0, maxLen - 3) + '...'
-  }
-
-  function isPairSelected(tag1: string, tag2: string): boolean {
-    if (!selectedPair) return false
-    return (selectedPair.tag1 === tag1 && selectedPair.tag2 === tag2) ||
-           (selectedPair.tag1 === tag2 && selectedPair.tag2 === tag1)
   }
 
   let correlationPairs = $derived.by(() => {
@@ -361,6 +311,7 @@
       {/if}
     </div>
 
+    <!-- Content -->
     <div class="flex-1 overflow-y-auto px-6 py-4">
       <!-- Summary -->
       <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
@@ -371,7 +322,7 @@
       {#if !isMultiTag && activeTab === 'overview'}
         {#if analysisResult?.statistics && analysisResult.statistics.count > 0}
         <div class="mb-4">
-          <h3 class="text-sm font-semibold mb-2 flex items-center gap-2">
+          <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2 flex items-center gap-2">
             <TrendingUp size={16} />
             Статистика
           </h3>
@@ -398,10 +349,14 @@
 
         {#if analysisResult?.anomalies?.total_anomalies > 0}
           <div class="mb-4">
-            <h3 class="text-sm font-semibold mb-2 flex items-center gap-2">
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2 flex items-center gap-2">
               <AlertTriangle size={16} class="text-red-500" />
               Аномалии ({analysisResult.anomalies.total_anomalies})
             </h3>
+            <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">
+              Обнаружено {analysisResult.anomalies.total_anomalies} аномальных точек
+              ({(analysisResult.anomalies.anomaly_rate * 100).toFixed(1)}% от общего числа)
+            </div>
             <div class="space-y-1 max-h-40 overflow-y-auto">
               {#each analysisResult.anomalies.anomaly_values.slice(0, 20) as value, i}
                 <div class="flex items-center justify-between p-2 bg-red-50 dark:bg-red-900/20 rounded text-xs">
@@ -421,11 +376,22 @@
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-sm font-semibold">График</h3>
             <div class="flex items-center gap-1">
-              <button type="button" onclick={zoomInTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить"><ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-              <button type="button" onclick={zoomOutTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-              <button type="button" onclick={resetZoomTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-              <button type="button" onclick={() => downloadPNG(tsChartInstance, 'timeseries')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+              <button type="button" onclick={zoomInTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить">
+                <ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" />
+              </button>
+              <button type="button" onclick={zoomOutTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить">
+                <ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" />
+              </button>
+              <button type="button" onclick={resetZoomTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить масштаб">
+                <RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" />
+              </button>
+              <button type="button" onclick={() => downloadPNG(tsChartInstance, 'timeseries')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG">
+                <Download size={14} class="text-neutral-600 dark:text-neutral-400" />
+              </button>
             </div>
+          </div>
+          <div class="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
+            💡 Колёсико — zoom · Shift+drag — область · Drag — прокрутка
           </div>
           <div id={tsChartId} class="h-[300px] bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700 p-3">
             {#if timeSeriesData.labels.length > 0}
@@ -439,14 +405,11 @@
 
       <!-- ==================== MULTI-TAG: CORRELATIONS ==================== -->
       {#if isMultiTag && activeTab === 'correlations'}
-        <!-- 1. Матрица корреляций (кликабельная!) -->
+        <!-- 1. Матрица корреляций (сверху) -->
         <div class="mb-4">
           <h3 class="text-sm font-semibold mb-2 flex items-center gap-2">
             <Grid3x3 size={16} />
             Матрица корреляций ({correlationMatrix?.tags?.length || 0} тегов)
-            <span class="text-xs font-normal text-neutral-500 dark:text-neutral-400">
-              — кликните на ячейку для scatter plot
-            </span>
           </h3>
           
           {#if correlationMatrix?.matrix}
@@ -460,7 +423,7 @@
                         class="p-2 bg-neutral-100 dark:bg-neutral-800 border-b border-r border-neutral-200 dark:border-neutral-700 text-center min-w-[100px]" 
                         title={tag}
                       >
-                        <div class="font-medium text-[11px]">{shortenTagName(tag)}</div>
+                        <div class="font-medium text-[11px]" title={tag}>{shortenTagName(tag)}</div>
                       </th>
                     {/each}
                   </tr>
@@ -468,17 +431,18 @@
                 <tbody>
                   {#each correlationMatrix.tags as tag1, i}
                     <tr>
-                      <td class="p-2 bg-neutral-100 dark:bg-neutral-800 border-b border-r border-neutral-200 dark:border-neutral-700 font-medium sticky left-0 z-10" title={tag1}>
-                        <div class="text-[11px]">{shortenTagName(tag1)}</div>
+                      <td 
+                        class="p-2 bg-neutral-100 dark:bg-neutral-800 border-b border-r border-neutral-200 dark:border-neutral-700 font-medium sticky left-0 z-10" 
+                        title={tag1}
+                      >
+                        <div class="text-[11px]" title={tag1}>{shortenTagName(tag1)}</div>
                       </td>
                       {#each correlationMatrix.tags as tag2, j}
                         {@const value = correlationMatrix.matrix[i][j]}
-                        {@const isSelected = isPairSelected(tag1, tag2)}
                         <td 
-                          class="p-2 text-center border-b border-r border-neutral-200 dark:border-neutral-700 transition font-mono {tag1 === tag2 ? 'cursor-default' : 'cursor-pointer hover:ring-2 hover:ring-blue-500'} {isSelected ? 'ring-2 ring-blue-600 ring-offset-1 dark:ring-offset-neutral-900' : ''}"
+                          class="p-2 text-center border-b border-r border-neutral-200 dark:border-neutral-700 cursor-pointer hover:ring-2 hover:ring-blue-500 transition font-mono"
                           style="background-color: {corrColor(value)}; color: {Math.abs(value) > 0.5 ? 'white' : 'inherit'}"
-                          title="{tag1} ↔ {tag2}: r = {formatNumber(value, 3)}{tag1 === tag2 ? '' : ' (клик для scatter plot)'}"
-                          onclick={() => tag1 !== tag2 && selectPair(tag1, tag2)}
+                          title="{tag1} ↔ {tag2}: r = {formatNumber(value, 3)}"
                         >
                           {formatNumber(value, 2)}
                         </td>
@@ -493,75 +457,72 @@
               <span>🔵 положительная</span>
               <span>🔴 отрицательная</span>
               <span>•</span>
-              <span>🟦 рамка = выбранная пара</span>
+              <span>Интенсивность цвета ∝ силе корреляции</span>
               <span>•</span>
-              <span>Кликните на ячейку для scatter plot</span>
+              <span>Наведите курсор на ячейку для деталей</span>
+            </div>
+          {:else}
+            <div class="h-60 flex items-center justify-center border border-neutral-200 dark:border-neutral-700 rounded text-sm text-neutral-400">
+              Нет данных матрицы
             </div>
           {/if}
         </div>
 
-        <!-- 2. Scatter plot (интерактивный) -->
+        <!-- 2. Scatter plot (снизу) -->
         <div class="mb-4">
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-sm font-semibold flex items-center gap-2">
               <ArrowRightLeft size={16} />
               Scatter plot
-              {#if pairAnalysis}
+              {#if analysisResult?.pair_analysis}
                 <span class="text-xs font-normal text-neutral-500 dark:text-neutral-400">
-                  ({pairAnalysis.tag1} × {pairAnalysis.tag2})
+                  ({analysisResult.pair_analysis.tag_x} × {analysisResult.pair_analysis.tag_y})
                 </span>
               {/if}
             </h3>
             <div class="flex items-center gap-1">
-              {#if !isLoadingPair}
-                <button type="button" onclick={zoomInScatter} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить"><ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                <button type="button" onclick={zoomOutScatter} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                <button type="button" onclick={resetZoomScatter} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                <button type="button" onclick={() => downloadPNG(scatterChartInstance, 'scatter')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-              {/if}
+              <button type="button" onclick={zoomInScatter} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить">
+                <ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" />
+              </button>
+              <button type="button" onclick={zoomOutScatter} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить">
+                <ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" />
+              </button>
+              <button type="button" onclick={resetZoomScatter} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить масштаб">
+                <RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" />
+              </button>
+              <button type="button" onclick={() => downloadPNG(scatterChartInstance, 'scatter')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG">
+                <Download size={14} class="text-neutral-600 dark:text-neutral-400" />
+              </button>
             </div>
           </div>
-          
-          <div id={scatterChartId} class="h-[400px] bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700 p-3 relative">
-            {#if isLoadingPair}
-              <div class="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-neutral-800/80 rounded z-10">
-                <div class="flex flex-col items-center gap-2">
-                  <Loader2 size={32} class="animate-spin text-blue-500" />
-                  <span class="text-sm text-neutral-600 dark:text-neutral-400">Загружаем пару...</span>
-                </div>
-              </div>
-            {/if}
-            
-            {#if pairError}
-              <div class="flex items-center justify-center h-full text-sm text-red-600 dark:text-red-400">
-                {pairError}
-              </div>
-            {:else if downsampledScatterData.datasets.length > 0}
-              <Line data={downsampledScatterData} options={scatterOptions} key={`${pairAnalysis?.tag1}_${pairAnalysis?.tag2}`} />
+          <div class="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
+            💡 Колёсико — zoom по X и Y · Shift+drag — область · Drag — прокрутка · Показано до 800 точек (downsampling)
+          </div>
+          <div id={scatterChartId} class="h-[400px] bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700 p-3">
+            {#if downsampledScatterData.datasets.length > 0}
+              <Line data={downsampledScatterData} options={scatterOptions} key={analysisResult?.analysis_id || 'scatter'} />
             {:else}
-              <div class="flex items-center justify-center h-full text-sm text-neutral-400">
-                Выберите пару тегов в матрице выше
-              </div>
+              <div class="flex items-center justify-center h-full text-sm text-neutral-400">Нет данных</div>
             {/if}
           </div>
           
-          {#if pairAnalysis}
+          {#if analysisResult?.pair_analysis}
             <div class="mt-3 grid grid-cols-4 gap-2">
               <div class="p-2 bg-neutral-50 dark:bg-neutral-800 rounded">
                 <div class="text-[10px] text-neutral-500 dark:text-neutral-400 mb-1">Pearson</div>
-                <div class="text-xs font-semibold">{pairAnalysis.pearson.interpretation}</div>
+                <div class="text-xs font-semibold">{analysisResult.pair_analysis.pearson.interpretation}</div>
               </div>
               <div class="p-2 bg-neutral-50 dark:bg-neutral-800 rounded">
                 <div class="text-[10px] text-neutral-500 dark:text-neutral-400 mb-1">Spearman</div>
-                <div class="text-xs font-semibold">{pairAnalysis.spearman.interpretation}</div>
+                <div class="text-xs font-semibold">{analysisResult.pair_analysis.spearman.interpretation}</div>
               </div>
               <div class="p-2 bg-neutral-50 dark:bg-neutral-800 rounded">
                 <div class="text-[10px] text-neutral-500 dark:text-neutral-400 mb-1">Mutual Info</div>
-                <div class="text-xs font-semibold">{pairAnalysis.mutual_info.interpretation}</div>
+                <div class="text-xs font-semibold">{analysisResult.pair_analysis.mutual_info.interpretation}</div>
               </div>
               <div class="p-2 bg-neutral-50 dark:bg-neutral-800 rounded">
                 <div class="text-[10px] text-neutral-500 dark:text-neutral-400 mb-1">Cross-corr lag</div>
-                <div class="text-xs font-semibold">{pairAnalysis.cross_correlation.interpretation}</div>
+                <div class="text-xs font-semibold">{analysisResult.pair_analysis.cross_correlation.interpretation}</div>
               </div>
             </div>
           {/if}
@@ -571,14 +532,9 @@
       <!-- ==================== MULTI-TAG: TABLE ==================== -->
       {#if isMultiTag && activeTab === 'table'}
         <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold">
-              Все пары (сортировано по силе корреляции)
-            </h3>
-            <span class="text-xs text-neutral-500 dark:text-neutral-400">
-              Кликните на строку → scatter plot
-            </span>
-          </div>
+          <h3 class="text-sm font-semibold mb-2">
+            Все пары (сортировано по силе корреляции)
+          </h3>
           <div class="border border-neutral-200 dark:border-neutral-700 rounded overflow-hidden">
             <table class="text-xs w-full">
               <thead>
@@ -594,11 +550,7 @@
               <tbody>
                 {#each correlationPairs as pair, i}
                   {@const badge = significanceBadge(pair.p_value)}
-                  {@const isSelected = isPairSelected(pair.tag1, pair.tag2)}
-                  <tr 
-                    class="border-t border-neutral-200 dark:border-neutral-700 cursor-pointer transition {isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50'}"
-                    onclick={() => { selectPair(pair.tag1, pair.tag2); activeTab = 'correlations'; }}
-                  >
+                  <tr class="border-t border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition">
                     <td class="p-2 text-neutral-500">{i + 1}</td>
                     <td class="p-2 font-mono text-[11px] truncate max-w-[200px]" title={pair.tag1}>{pair.tag1}</td>
                     <td class="p-2 font-mono text-[11px] truncate max-w-[200px]" title={pair.tag2}>{pair.tag2}</td>
@@ -623,10 +575,11 @@
             </table>
           </div>
 
-          <!-- Подробные пояснения -->
+          <!-- Подробные пояснения внизу -->
           <div class="mt-6 space-y-4">
+            <!-- Коэффициент r -->
             <div class="p-4 bg-neutral-50 dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700">
-              <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
+              <h4 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2 flex items-center gap-2">
                 <Info size={14} class="text-blue-500" />
                 Коэффициент корреляции Пирсона (r)
               </h4>
@@ -638,7 +591,7 @@
                   <div class="font-medium mb-1">Направление:</div>
                   <ul class="space-y-1 ml-3 list-disc">
                     <li><span class="font-semibold text-blue-600 dark:text-blue-400">r &gt; 0</span> — положительная связь (растёт X → растёт Y)</li>
-                    <li><span class="font-semibold text-red-600 dark:text-red-400">r &lt; 0</span> — отрицательная (растёт X → падает Y)</li>
+                    <li><span class="font-semibold text-red-600 dark:text-red-400">r &lt; 0</span> — отрицательная связь (растёт X → падает Y)</li>
                     <li><span class="font-semibold">r ≈ 0</span> — линейной связи нет</li>
                   </ul>
                 </div>
@@ -648,37 +601,45 @@
                     <li><span class="font-semibold">|r| ≥ 0.7</span> — сильная</li>
                     <li><span class="font-semibold">0.5 ≤ |r| &lt; 0.7</span> — умеренная</li>
                     <li><span class="font-semibold">0.3 ≤ |r| &lt; 0.5</span> — слабая</li>
-                    <li><span class="font-semibold">|r| &lt; 0.3</span> — очень слабая</li>
+                    <li><span class="font-semibold">|r| &lt; 0.3</span> — очень слабая / отсутствует</li>
                   </ul>
                 </div>
               </div>
             </div>
 
+            <!-- p-value -->
             <div class="p-4 bg-neutral-50 dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700">
-              <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
+              <h4 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2 flex items-center gap-2">
                 <Info size={14} class="text-blue-500" />
                 p-value (уровень значимости)
               </h4>
               <p class="text-xs text-neutral-700 dark:text-neutral-300 mb-2">
                 Показывает <strong>вероятность получить такую корреляцию случайно</strong>, если на самом деле связи между тегами нет.
               </p>
+              <p class="text-xs text-neutral-700 dark:text-neutral-300 mb-2">
+                Чем <strong>меньше p-value</strong>, тем больше уверенность, что найденная связь — реальная, а не случайная.
+              </p>
               <div class="text-xs text-neutral-700 dark:text-neutral-300">
                 <div class="font-medium mb-1">Интерпретация:</div>
                 <ul class="space-y-1 ml-3 list-disc">
-                  <li><span class="font-semibold">p &lt; 0.001</span> — высоко значимая (&lt; 0.1%)</li>
+                  <li><span class="font-semibold">p &lt; 0.001</span> — высоко значимая (вероятность случайности &lt; 0.1%)</li>
                   <li><span class="font-semibold">p &lt; 0.01</span> — значимая (&lt; 1%)</li>
-                  <li><span class="font-semibold">p &lt; 0.05</span> — слабо значимая (&lt; 5%)</li>
-                  <li><span class="font-semibold">p ≥ 0.05</span> — не значимая (нельзя доверять)</li>
+                  <li><span class="font-semibold">p &lt; 0.05</span> — слабо значимая (&lt; 5%, традиционно принятый порог)</li>
+                  <li><span class="font-semibold">p ≥ 0.05</span> — не значимая (связь могла возникнуть случайно, доверять ей нельзя)</li>
                 </ul>
               </div>
             </div>
 
+            <!-- Значимость -->
             <div class="p-4 bg-neutral-50 dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700">
-              <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
+              <h4 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2 flex items-center gap-2">
                 <Info size={14} class="text-blue-500" />
                 Значимость (звёзды в таблице)
               </h4>
-              <div class="grid grid-cols-2 gap-2 text-xs mb-3">
+              <p class="text-xs text-neutral-700 dark:text-neutral-300 mb-3">
+                Общепринятая <strong>звёздочная нотация</strong> для краткой записи уровня значимости в научных статьях и отчётах.
+              </p>
+              <div class="grid grid-cols-2 gap-2 text-xs">
                 <div class="flex items-center gap-2 p-2 bg-white dark:bg-neutral-900 rounded">
                   <span class="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded font-medium">***</span>
                   <span class="text-neutral-700 dark:text-neutral-300">Высоко значимая (p &lt; 0.001)</span>
@@ -693,11 +654,11 @@
                 </div>
                 <div class="flex items-center gap-2 p-2 bg-white dark:bg-neutral-900 rounded">
                   <span class="px-2 py-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-500 rounded font-medium">ns</span>
-                  <span class="text-neutral-700 dark:text-neutral-300">Не значимая (p ≥ 0.05)</span>
+                  <span class="text-neutral-700 dark:text-neutral-300">Не значимая (p ≥ 0.05) — <em>not significant</em></span>
                 </div>
               </div>
-              <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
-                💡 Доверять стоит только значимым корреляциям. Пары с <code class="px-1 bg-neutral-200 dark:bg-neutral-700 rounded">ns</code> статистически не отличаются от случайного шума.
+              <p class="text-[11px] text-neutral-500 dark:text-neutral-400 mt-3">
+                💡 <strong>Практический смысл:</strong> доверять стоит только значимым корреляциям (★/★★/★★★). Пары с пометкой <code class="px-1 bg-neutral-200 dark:bg-neutral-700 rounded">ns</code> — статистически не отличаются от случайного шума, даже если коэффициент r кажется большим.
               </p>
             </div>
           </div>
@@ -714,3 +675,70 @@
     </div>
   {/if}
 </div>
+'''
+
+results_path.write_text(new_results, encoding='utf-8', newline='\n')
+
+print('✅ DeepAnalysisResults.svelte обновлён')
+print()
+print('=' * 70)
+print('ЧТО ИСПРАВЛЕНО:')
+print('=' * 70)
+print()
+print('1. ✓ Матрица корреляций — полные имена тегов')
+print('   • Заголовки показывают полное имя (с сокращением до 25 символов)')
+print('   • Tooltip на каждой ячейке — полное имя: "R203-Temperature ↔ R203-CO2: r = 0.752"')
+print()
+print('2. ✓ Scatter plot перенесён под матрицу корреляций')
+print('   • Было: grid-cols-2 (2 колонки)')
+print('   • Стало: вертикальный layout (матрица сверху, scatter снизу)')
+print()
+print('3. ✓ Zoom/scroll/download на scatter plot')
+print('   • Кнопки ZoomIn / ZoomOut / Reset / Download PNG')
+print('   • Колёсико мыши — zoom по X и Y')
+print('   • Shift+drag — выделить область')
+print('   • Drag — прокрутка')
+print()
+print('4. ✓ Scatter plot читабельный')
+print('   • Downsampling до 800 точек (случайная выборка)')
+print('   • Alpha transparency (0.35-0.4) — видны перекрытия')
+print('   • PointRadius 2.5 — мелкие точки, видно плотность')
+print('   • PointHoverRadius 5 — при наведении крупнее')
+print()
+print('5. ✓ Вкладка "Таблица пар" — подробные пояснения')
+print()
+print('   Блок "Коэффициент корреляции Пирсона (r)":')
+print('   • Направление: r>0 / r<0 / r≈0')
+print('   • Сила связи: сильная / умеренная / слабая')
+print()
+print('   Блок "p-value (уровень значимости)":')
+print('   • Объяснение: "вероятность получить такую корреляцию случайно"')
+print('   • Интерпретация по порогам 0.001 / 0.01 / 0.05')
+print()
+print('   Блок "Значимость (звёзды в таблице)":')
+print('   • Карточки с визуализацией каждой метки')
+print('   • *** / ** / * / ns с пояснениями')
+print('   • Практический смысл: "доверять только значимым"')
+print()
+print('=' * 70)
+print('ПРОВЕРКА:')
+print('=' * 70)
+print()
+print('1. Открой фронтенд → Activity → выбери 3-5 тегов → анализ')
+print()
+print('2. Вкладка "Корреляции":')
+print('   • Сверху: матрица с полными именами (tooltip на ячейках)')
+print('   • Снизу: scatter plot с кнопками zoom/reset/download')
+print('   • Попробуй колёсико мыши на scatter — должен быть zoom')
+print('   • Нажми Download PNG — скачается график')
+print()
+print('3. Вкладка "Таблица пар":')
+print('   • Прокрути вниз — увидишь 3 информационных блока')
+print('   • "Коэффициент r" — что такое r и как интерпретировать')
+print('   • "p-value" — что это и какие пороги значимости')
+print('   • "Значимость" — карточки ***/**/*/ns с объяснениями')
+print()
+print('Если scatter всё ещё "мешанина":')
+print('  • Возможно все 3 тега имеют дискретные значения (0/1)')
+print('  • Тогда 800 точек это 4 уникальные координаты')
+print('  • Попробуй теги с непрерывными значениями (temperature, pressure)')

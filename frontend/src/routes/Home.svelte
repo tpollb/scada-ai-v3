@@ -38,7 +38,7 @@
   let showLogsPanel = $state(false)
   let showDeepAnalysisPanel = $state(false)
   let ddaTags = $state<any[]>([])
-  let ddaSelectedTag = $state<string>('')
+  let ddaSelectedTags = $state<string[]>([])
   let ddaPeriod = $state<number>(30)
   let ddaIsAnalyzing = $state(false)
   let ddaAnalysisResult = $state<any>(null)
@@ -51,7 +51,7 @@
 
   
   async function runDDAAnalysis() {
-    if (!ddaSelectedTag) {
+    if (ddaSelectedTags.length === 0) {
       ddaError = 'Выберите тег для анализа'
       return
     }
@@ -63,7 +63,7 @@
     try {
       const response = await api.post('api/v1/deep_analysis/run', {
         json: {
-          tags: [ddaSelectedTag],
+          tags: ddaSelectedTags,
           period: ddaPeriod,
           anomalies: true,
           correlations: false,
@@ -202,8 +202,8 @@ async function handleSend(message: string) {
       api.get('api/v1/deep_analysis/tags').json().then((tags: any[]) => {
         console.log('✓ DDA tags loaded:', tags.length)
         ddaTags = tags
-        if (tags.length > 0 && !ddaSelectedTag) {
-          ddaSelectedTag = tags[0].tag_name
+        if (tags.length > 0 && ddaSelectedTags.length === 0) {
+          ddaSelectedTags = [tags[0].tag_name]
         }
       }).catch((e: any) => {
         console.error('Failed to fetch DDA tags:', e)
@@ -218,7 +218,7 @@ async function handleSend(message: string) {
   <header class="bg-neutral-100 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors">
     <div class="flex items-center gap-3">
       <h1 class="text-base font-mono text-neutral-500 dark:text-neutral-400 tracking-tight">
-        SCADA.AI <span class="text-neutral-400 dark:text-neutral-500">v3.2.1</span>
+        SCADA.AI <span class="text-neutral-400 dark:text-neutral-500">v3.2.2</span>
       </h1>
     </div>
     <div class="flex items-center gap-2">
@@ -273,11 +273,11 @@ async function handleSend(message: string) {
     {#if showDeepAnalysisPanel}
       <DeepAnalysisControls
         tags={ddaTags}
-        selectedTag={ddaSelectedTag}
+        selectedTags={ddaSelectedTags}
         period={ddaPeriod}
         isAnalyzing={ddaIsAnalyzing}
         error={ddaError}
-        onTagChange={(tag) => ddaSelectedTag = tag}
+        onTagsChange={(tags) => ddaSelectedTags = tags}
         onPeriodChange={(period) => ddaPeriod = period}
         onRunAnalysis={runDDAAnalysis}
         onClose={() => showDeepAnalysisPanel = false}
