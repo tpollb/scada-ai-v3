@@ -1,5 +1,5 @@
 """Config API — управление модулями, промптами и системными настройками"""
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from structlog import get_logger
 from pathlib import Path
@@ -369,3 +369,71 @@ async def toggle_module(module_name: str, req: ModuleToggleRequest):
         "restart_required": True,
         "enabled_modules": current_modules
     }
+
+
+# ============================================================================
+# DDA Settings (Deep Data Analysis)
+# ============================================================================
+
+@router.get("/modules/deep_analysis/settings")
+async def get_dda_settings():
+    """Возвращает настройки модуля DDA"""
+    try:
+        from modules.deep_analysis.settings import load_dda_settings, DDASettings
+        settings = load_dda_settings()
+        return settings.model_dump()
+    except ImportError as e:
+        log.error("DDA settings module not found", error=str(e))
+        raise HTTPException(status_code=404, detail="Модуль deep_analysis не найден")
+    except Exception as e:
+        log.error("Failed to load DDA settings", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/modules/deep_analysis/settings")
+async def update_dda_settings(settings: dict):
+    """Обновляет настройки модуля DDA"""
+    try:
+        from modules.deep_analysis.settings import DDASettings, save_dda_settings, reload_dda_settings
+        
+        # Валидируем через Pydantic
+        dda_settings = DDASettings(**settings)
+        
+        # Сохраняем в config.yaml
+        save_dda_settings(dda_settings)
+        
+        log.info("DDA settings updated")
+        
+        return {
+            "status": "ok",
+            "message": "Настройки DDA сохранены. Изменения применятся при следующем анализе.",
+            "settings": dda_settings.model_dump()
+        }
+    except ImportError as e:
+        log.error("DDA settings module not found", error=str(e))
+        raise HTTPException(status_code=404, detail="Модуль deep_analysis не найден")
+    except Exception as e:
+        log.error("Failed to update DDA settings", error=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/modules/deep_analysis/settings/reset")
+async def reset_dda_settings():
+    """Сбрасывает настройки DDA к дефолтным"""
+    try:
+        from modules.deep_analysis.settings import DDASettings, save_dda_settings, reload_dda_settings
+        
+        default_settings = DDASettings()
+        save_dda_settings(default_settings)
+        
+        log.info("DDA settings reset to defaults")
+        
+        return {
+            "status": "ok",
+            "message": "Настройки DDA сброшены к значениям по умолчанию",
+            "settings": default_settings.model_dump()
+        }
+    except Exception as e:
+        log.error("Failed to reset DDA settings", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+

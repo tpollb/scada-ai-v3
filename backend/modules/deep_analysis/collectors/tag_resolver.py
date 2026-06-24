@@ -30,7 +30,6 @@ async def get_available_tags() -> list[dict]:
         SELECT 
             td.tag_id,
             td.tag_name,
-            td.unit,
             (
                 SELECT tv.value 
                 FROM tags_value tv 
@@ -47,7 +46,7 @@ async def get_available_tags() -> list[dict]:
             ) as last_update
         FROM tags_dict td
         ORDER BY td.tag_name ASC
-        LIMIT 1000
+        LIMIT 10000
     """
     
     try:
@@ -62,7 +61,7 @@ async def get_available_tags() -> list[dict]:
                     td.tag_name
                 FROM tags_dict td
                 ORDER BY td.tag_name ASC
-                LIMIT 1000
+                LIMIT 10000
             """
             rows = await fetch(simple_query)
         except Exception as e2:

@@ -1,10 +1,12 @@
+<!-- svelte-ignore a11y_label_has_associated_control -->
 <script lang="ts">
   import { onMount } from 'svelte'
   import { navigate } from '../stores/ui'
-  import { ArrowLeft, RefreshCw, Save, AlertCircle, CheckCircle, Server, Database, Key, Sun, Moon, FileText, Wrench, Plus, Trash2, Edit2, DollarSign, Zap, Droplet, Flame } from 'lucide-svelte'
+  import { Activity, AlertCircle, ArrowLeft, CheckCircle, Database, DollarSign, Droplet, Edit2, FileText, Flame, Key, Moon, Plus, RefreshCw, Save, Server, Sun, Trash2, Wrench, Zap } from 'lucide-svelte'
   import { theme } from '../stores/theme'
   import api from '../lib/api'
   import DocsViewer from '../components/DocsViewer.svelte'
+  import DDAConfigPanel from '../components/config/DDAConfigPanel.svelte'
 
   interface ModuleInfo {
     name: string
@@ -65,7 +67,7 @@
   }
 
 
-  let activeTab = $state<'modules' | 'system' | 'docs' | 'energy'>('modules')
+  let activeTab = $state<'modules' | 'system' | 'docs' | 'energy' | 'dda'>('modules')
   let modules = $state<ModuleInfo[]>([])
   let envConfig = $state<EnvConfig | null>(null)
   let loading = $state(true)
@@ -481,6 +483,14 @@
       >
         Модули
       </button>
+          <button
+            type="button"
+            onclick={() => activeTab = 'dda'}
+            class="px-4 py-2 text-sm font-medium rounded transition {activeTab === 'dda' ? 'bg-white shadow-sm text-neutral-900' : 'text-neutral-600 hover:bg-neutral-100'} flex items-center gap-1.5"
+          >
+            <Activity size={14} />
+            DDA
+          </button>
       <button
         type="button"
         onclick={() => activeTab = 'system'}
@@ -1033,6 +1043,13 @@
       </div>
     </div>
   {/if}
+
+      {#if activeTab === 'dda'}
+        <div class="p-6">
+          <DDAConfigPanel />
+        </div>
+      {/if}
+
 
   {#if editingPrompt}
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

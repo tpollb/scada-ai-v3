@@ -114,7 +114,7 @@ async def fetch_tag_data(
           AND tv.date_created <= $3
           {null_clause}
         ORDER BY tv.date_created ASC
-        LIMIT 100000
+        
     """
     
     try:

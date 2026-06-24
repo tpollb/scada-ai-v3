@@ -11,7 +11,7 @@ from modules.deep_analysis.collectors.tag_resolver import get_available_tags
 from modules.deep_analysis.analyzers.stats import compute_basic_stats, compute_histogram
 from modules.deep_analysis.analyzers.anomalies import detect_anomalies_isolation_forest
 from modules.deep_analysis.analyzers.correlations import compute_correlation_matrix, compute_pair_correlation
-from modules.deep_analysis.visualizers.chart_specs import create_time_series_spec, create_histogram_spec, create_heatmap_spec, create_scatter_spec
+from modules.deep_analysis.visualizers.chart_specs import create_time_series_spec, create_histogram_spec, create_heatmap_spec, create_scatter_spec, create_multitag_time_series_spec
 from modules.deep_analysis.history.storage import save_analysis, load_analysis, list_analyses, generate_analysis_id
 
 log = get_logger()
@@ -32,8 +32,6 @@ class AnalysisRequest(BaseModel):
     correlations: bool = Field(True, description="Корреляции (для группы тегов)")
     seasonality: bool = Field(True, description="Сезонность (FFT)")
     compare_periods: bool = Field(False, description="Сравнение с предыдущим периодом")
-
-
 
 
 class PairAnalysisRequest(BaseModel):
@@ -136,28 +134,28 @@ async def run_analysis(request: AnalysisRequest):
             # Сбор данных
             data = await fetch_tag_data(tag_name, start_date, end_date)
             
-            if not data['values']:
+            if not data['raw_values']:
                 raise HTTPException(
                     status_code=404,
                     detail=f"No data found for tag '{tag_name}' in the specified period"
                 )
             
             # Базовая статистика
-            stats = compute_basic_stats(data['values'])
-            histogram = compute_histogram(data['values'])
+            stats = compute_basic_stats(data['raw_values'])
+            histogram = compute_histogram(data['raw_values'])
             
             # Детекция аномалий
             anomalies_result = None
             if request.anomalies:
                 anomalies_result = detect_anomalies_isolation_forest(
-                    data['values'],
-                    data['timestamps']
+                    data['raw_values'],
+                    data['raw_timestamps']
                 )
             
             # Визуализации
             time_series_spec = create_time_series_spec(
-                data['timestamps'],
-                data['values'],
+                data['raw_timestamps'],
+                data['raw_values'],
                 tag_name,
                 anomalies=anomalies_result
             )
@@ -182,7 +180,7 @@ async def run_analysis(request: AnalysisRequest):
             summary = " ".join(summary_parts)
         
         else:
-            # Группа тегов — кросс-анализ (корреляции)
+            # Группа тегов — кросс-анализ (корреляции) + аномалии для каждого тега
             log.info("Multi-tag analysis", tags=request.tags)
             
             # Сбор данных с выравниванием
@@ -206,7 +204,7 @@ async def run_analysis(request: AnalysisRequest):
                 method='pearson'
             )
             
-            # Детальный анализ для первой пары (как пример)
+            # Детальный анализ для первой пары
             if len(request.tags) >= 2:
                 tag1, tag2 = request.tags[0], request.tags[1]
                 pair_analysis = compute_pair_correlation(
@@ -216,6 +214,40 @@ async def run_analysis(request: AnalysisRequest):
                 )
             else:
                 pair_analysis = None
+            
+            # НОВОЕ: Детекция аномалий для каждого тега (с классификацией по типам)
+            anomalies_per_tag = {}
+            total_type_counts = {}
+            total_anomalies = 0
+            
+            for tag_name in request.tags:
+                tag_data = data['tags'].get(tag_name, {})
+                aligned_values = tag_data.get('aligned_values', [])
+                
+                # Фильтруем None значения
+                valid_values = [v for v in aligned_values if v is not None]
+                
+                if len(valid_values) >= 10:
+                    adaptive_contamination = min(0.15, max(0.08, 200 / max(len(valid_values), 1)))
+                    tag_anomalies = detect_anomalies_isolation_forest(
+                        valid_values,
+                        list(range(len(valid_values))),
+                        contamination=adaptive_contamination,  # псевдо-timestamps (индексы)
+                        classify_types=True
+                    )
+                    anomalies_per_tag[tag_name] = tag_anomalies
+                    total_anomalies += tag_anomalies['total_anomalies']
+                    
+                    # Агрегируем type_counts
+                    for atype, count in tag_anomalies.get('type_counts', {}).items():
+                        total_type_counts[atype] = total_type_counts.get(atype, 0) + count
+            
+            # Формируем общий anomalies объект (для совместимости с UI)
+            combined_anomalies = {
+                "per_tag": anomalies_per_tag,
+                "total_anomalies": total_anomalies,
+                "type_counts": total_type_counts,
+            } if total_anomalies > 0 else None
             
             # Визуализации
             heatmap_spec = create_heatmap_spec(correlation_matrix)
@@ -228,6 +260,14 @@ async def run_analysis(request: AnalysisRequest):
                     pair_analysis['tag_y'],
                     pair_analysis['pearson']['coefficient']
                 )
+            
+            # НОВОЕ: time series spec с аномалиями для мульти-тег
+            # Создаём график со всеми тегами + цветовая кодировка аномалий
+            time_series_spec = create_multitag_time_series_spec(
+                data['tags'],
+                data['common_timestamps'],
+                anomalies_per_tag
+            )
             
             # Формируем результаты
             results = {
@@ -254,6 +294,18 @@ async def run_analysis(request: AnalysisRequest):
             if max_pair:
                 summary_parts.append(
                     f"Самая сильная корреляция: {max_pair[0]} ↔ {max_pair[1]} (r={max_corr:.2f})"
+                )
+            
+            # Добавляем информацию об аномалиях
+            if combined_anomalies and combined_anomalies['total_anomalies'] > 0:
+                tc = combined_anomalies['type_counts']
+                type_parts = []
+                if tc.get('spike', 0): type_parts.append(f"пиков: {tc['spike']}")
+                if tc.get('dip', 0): type_parts.append(f"провалов: {tc['dip']}")
+                if tc.get('drift', 0): type_parts.append(f"дрейфов: {tc['drift']}")
+                if tc.get('noise', 0): type_parts.append(f"шумов: {tc['noise']}")
+                summary_parts.append(
+                    f"Обнаружено аномалий: {combined_anomalies['total_anomalies']} ({', '.join(type_parts)})"
                 )
             
             summary = " ".join(summary_parts)
@@ -293,7 +345,7 @@ async def run_analysis(request: AnalysisRequest):
                     "time_series": time_series_spec,
                     "histogram": histogram_spec,
                 },
-                history_path=history_path,
+                history_path=history_path
             )
         else:
             # Мульти-тег
@@ -304,15 +356,16 @@ async def run_analysis(request: AnalysisRequest):
                 tags=request.tags,
                 period=period_str,
                 summary=summary,
-                statistics=None,  # для мульти-тега статистика по каждому тегу отдельно
-                anomalies=None,
-                correlations=results.get('correlation_matrix'),
+                statistics=None,
+                anomalies=combined_anomalies,  # НОВОЕ: аномалии для мульти-тег
+                correlations=correlation_matrix,
                 seasonality=None,
                 visualizations={
                     "heatmap": heatmap_spec,
                     "scatter": scatter_spec,
+                    "time_series": time_series_spec,  # НОВОЕ: график с аномалиями
                 },
-                history_path=history_path,
+                history_path=history_path
             )
         
         log.info("Analysis completed", id=analysis_id, summary=summary[:100])
@@ -324,8 +377,6 @@ async def run_analysis(request: AnalysisRequest):
         tb = traceback.format_exc()
         log.error("Analysis failed", error=str(e), tags=request.tags, traceback=tb)
         raise HTTPException(status_code=500, detail=f"Analysis failed: {type(e).__name__}: {str(e)}")
-
-
 
 
 @router.post("/pair", response_model=PairAnalysisResponse)
@@ -384,13 +435,311 @@ async def analyze_pair(request: PairAnalysisRequest):
             mutual_info=pair_analysis['mutual_info'],
             cross_correlation=pair_analysis['cross_correlation'],
             scatter_data=pair_analysis['scatter_data'],
-            scatter_spec=scatter_spec,
+            scatter_spec=scatter_spec
         )
     
     except HTTPException:
         raise
     except Exception as e:
         log.error("Pair analysis failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/diagnose/{tag_name}")
+async def diagnose_tag(tag_name: str, period: int = 30):
+    """
+    Диагностический endpoint — показывает детальную информацию о теге.
+    
+    Возвращает:
+    - Количество точек в БД по диапазонам
+    - Последние 20 точек с датами
+    - Все аномалии с датами и значениями
+    - Плато (повторяющиеся значения)
+    """
+    from datetime import datetime, timedelta
+    from core.db import fetch
+    
+    log.info("Running diagnostics", tag=tag_name, period=period)
+    
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=period)
+    
+    try:
+        # 1. Диапазон данных
+        range_query = """
+            SELECT 
+                MIN(tv.date_created) as first_ts,
+                MAX(tv.date_created) as last_ts,
+                COUNT(*) as total
+            FROM tags_value tv
+            JOIN tags_dict td ON td.tag_id = tv.tag_id
+            WHERE td.tag_name = $1
+              AND tv.date_created >= $2
+              AND tv.date_created <= $3
+        """
+        range_result = await fetch(range_query, tag_name, start_date, end_date)
+        
+        # 2. Распределение по неделям
+        weeks = []
+        for week in range(4):
+            w_start = start_date + timedelta(weeks=week)
+            w_end = w_start + timedelta(weeks=1)
+            
+            week_query = """
+                SELECT COUNT(*) as cnt
+                FROM tags_value tv
+                JOIN tags_dict td ON td.tag_id = tv.tag_id
+                WHERE td.tag_name = $1
+                  AND tv.date_created >= $2
+                  AND tv.date_created < $3
+            """
+            week_result = await fetch(week_query, tag_name, w_start, w_end)
+            weeks.append({
+                "start": w_start.isoformat(),
+                "end": w_end.isoformat(),
+                "count": week_result[0]['cnt'] if week_result else 0
+            })
+        
+        # 3. Последние 20 точек
+        last_query = """
+            SELECT tv.date_created, tv.value
+            FROM tags_value tv
+            JOIN tags_dict td ON td.tag_id = tv.tag_id
+            WHERE td.tag_name = $1
+            ORDER BY tv.date_created DESC
+            LIMIT 20
+        """
+        last_result = await fetch(last_query, tag_name)
+        last_points = [
+            {
+                "timestamp": r['date_created'].isoformat(),
+                "value": float(r['value']) if r['value'] is not None else None
+            }
+            for r in last_result
+        ]
+        
+        # 4. Низкие значения (< 200)
+        low_query = """
+            SELECT tv.date_created, tv.value
+            FROM tags_value tv
+            JOIN tags_dict td ON td.tag_id = tv.tag_id
+            WHERE td.tag_name = $1
+              AND tv.date_created >= $2
+              AND tv.date_created <= $3
+              AND tv.value < 200
+            ORDER BY tv.date_created ASC
+            LIMIT 50
+        """
+        low_result = await fetch(low_query, tag_name, start_date, end_date)
+        low_points = [
+            {
+                "timestamp": r['date_created'].isoformat(),
+                "value": float(r['value'])
+            }
+            for r in low_result
+        ]
+        
+        # 5. Запускаем анализ аномалий
+        from modules.deep_analysis.collectors.data_fetcher import fetch_tag_data
+        from modules.deep_analysis.analyzers.anomalies import (
+    detect_anomalies_isolation_forest,
+    detect_zero_dips,
+    detect_significant_dips,
+    group_anomaly_events,
+    _is_monotonic,
+    _is_plateau,
+    _compute_linear_trend,
+    _compute_relative_change,
+)
+        
+        data = await fetch_tag_data(tag_name, start_date, end_date)
+        
+        # Zero dips
+        zd = detect_zero_dips(data['raw_values'], data['raw_timestamps'])
+        zero_dips_events = []
+        for e in zd['events'][:10]:
+            ts_start = data['raw_timestamps'][e['start_idx']] if e['start_idx'] < len(data['raw_timestamps']) else None
+            ts_end = data['raw_timestamps'][e['end_idx']] if e['end_idx'] < len(data['raw_timestamps']) else None
+            zero_dips_events.append({
+                "start": ts_start.isoformat() if ts_start else None,
+                "end": ts_end.isoformat() if ts_end else None,
+                "duration": e['duration'],
+                "min_value": e['min_value']
+            })
+        
+        # Significant dips
+        sd = detect_significant_dips(data['raw_values'], data['raw_timestamps'])
+        sig_dips_events = []
+        for e in sd['events'][:10]:
+            ts_start = data['raw_timestamps'][e['start_idx']] if e['start_idx'] < len(data['raw_timestamps']) else None
+            ts_end = data['raw_timestamps'][e['end_idx']] if e['end_idx'] < len(data['raw_timestamps']) else None
+            sig_dips_events.append({
+                "start": ts_start.isoformat() if ts_start else None,
+                "end": ts_end.isoformat() if ts_end else None,
+                "duration": e['duration'],
+                "drop_percent": e.get('drop_percent', 0),
+                "min_value": e['min_value'],
+                "mean_before": e.get('local_mean_before', 0)
+            })
+        
+        # Полная детекция
+        result = detect_anomalies_isolation_forest(
+            data['raw_values'],
+            data['raw_timestamps'],
+            contamination=0.10,
+            classify_types=True
+        )
+        
+        # Детали по типам
+        type_details = {}
+        for atype in ['spike', 'dip', 'drift', 'noise']:
+            indices = [
+                i for i, t in zip(result['anomaly_indices'], result['anomaly_types'])
+                if t == atype
+            ]
+            
+            points = []
+            for idx in indices[:10]:
+                if idx < len(data['raw_timestamps']) and idx < len(data['raw_values']):
+                    points.append({
+                        "idx": idx,
+                        "timestamp": data['raw_timestamps'][idx].isoformat(),
+                        "value": float(data['raw_values'][idx]) if data['raw_values'][idx] is not None else None
+                    })
+            
+            type_details[atype] = {
+                "count": len(indices),
+                "sample": points
+            }
+        
+        # Плато
+        plateaus = []
+        current_val = None
+        current_count = 0
+        current_start = None
+        
+        for i, val in enumerate(data['raw_values']):
+            if val == current_val:
+                current_count += 1
+            else:
+                if current_count >= 5:
+                    ts_start = data['raw_timestamps'][current_start] if current_start < len(data['raw_timestamps']) else None
+                    ts_end = data['raw_timestamps'][i-1] if i-1 < len(data['raw_timestamps']) else None
+                    
+                    # Типы в этом плато
+                    types_in_plateau = set()
+                    for j in range(current_start, i):
+                        if j in result['anomaly_indices']:
+                            idx_in_list = result['anomaly_indices'].index(j)
+                            types_in_plateau.add(result['anomaly_types'][idx_in_list])
+                    
+                    plateaus.append({
+                        "start": ts_start.isoformat() if ts_start else None,
+                        "end": ts_end.isoformat() if ts_end else None,
+                        "count": current_count,
+                        "value": float(current_val) if current_val is not None else None,
+                        "types": list(types_in_plateau)
+                    })
+                current_val = val
+                current_count = 1
+                current_start = i
+        
+        return {
+            "tag_name": tag_name,
+            "period": f"{start_date.isoformat()} - {end_date.isoformat()}",
+            "db_range": {
+                "first_ts": range_result[0]['first_ts'].isoformat() if range_result and range_result[0]['first_ts'] else None,
+                "last_ts": range_result[0]['last_ts'].isoformat() if range_result and range_result[0]['last_ts'] else None,
+                "total_in_period": range_result[0]['total'] if range_result else 0
+            },
+            "distribution_by_weeks": weeks,
+            "last_20_points": last_points,
+            "low_values_under_200": {
+                "count": len(low_points),
+                "sample": low_points
+            },
+            "anomalies": {
+                "total": result['total_anomalies'],
+                "type_counts": result['type_counts'],
+                "zero_dips_events": zero_dips_events,
+                "sig_dips_events": sig_dips_events,
+                "by_type": type_details
+            },
+            "plateaus_5plus": plateaus[:10]
+        }
+    
+    except Exception as e:
+        log.error("Diagnostics failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/diagnose_weeks/{tag_name}")
+async def diagnose_anomalies_by_weeks(tag_name: str, period: int = 30):
+    """
+    Диагностика: распределение аномалий по неделям.
+    Помогает понять, где именно пропадают аномалии.
+    """
+    from datetime import datetime, timedelta
+    from modules.deep_analysis.collectors.data_fetcher import fetch_tag_data
+    from modules.deep_analysis.analyzers.anomalies import detect_anomalies_isolation_forest
+    
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=period)
+    
+    try:
+        data = await fetch_tag_data(tag_name, start_date, end_date)
+        
+        result = detect_anomalies_isolation_forest(
+            data['raw_values'],
+            data['raw_timestamps'],
+            classify_types=True
+        )
+        
+        # Распределяем аномалии по неделям
+        weeks = []
+        for week in range(4):
+            w_start = start_date + timedelta(weeks=week)
+            w_end = w_start + timedelta(weeks=1)
+            
+            week_anomalies = {
+                "start": w_start.isoformat(),
+                "end": w_end.isoformat(),
+                "total_points": 0,
+                "anomalies": {"spike": 0, "dip": 0, "drift": 0, "noise": 0},
+                "sample_points": []
+            }
+            
+            # Считаем точки и аномалии в этой неделе
+            for i, (ts, val) in enumerate(zip(data['raw_timestamps'], data['raw_values'])):
+                if w_start <= ts < w_end:
+                    week_anomalies["total_points"] += 1
+                    
+                    if i in result['anomaly_indices']:
+                        idx_in_list = result['anomaly_indices'].index(i)
+                        atype = result['anomaly_types'][idx_in_list]
+                        week_anomalies["anomalies"][atype] = week_anomalies["anomalies"].get(atype, 0) + 1
+                        
+                        # Первые 3 примера
+                        if len(week_anomalies["sample_points"]) < 3:
+                            week_anomalies["sample_points"].append({
+                                "timestamp": ts.isoformat(),
+                                "value": float(val) if val is not None else None,
+                                "type": atype
+                            })
+            
+            weeks.append(week_anomalies)
+        
+        return {
+            "tag_name": tag_name,
+            "period": f"{start_date.isoformat()} - {end_date.isoformat()}",
+            "total_anomalies": result['total_anomalies'],
+            "type_counts": result['type_counts'],
+            "anomaly_rate": result['anomaly_rate'],
+            "by_week": weeks,
+            "near_drift_events": near_drift[:20],  # топ-20 кандидатов в дрейфы
+        }
+    
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -1,4 +1,18 @@
 <script lang="ts">
+  function formatAnomalyDate(timestamp: any): string {
+    if (!timestamp) return '—'
+    try {
+      const d = new Date(timestamp)
+      if (isNaN(d.getTime())) return String(timestamp)
+      return d.toLocaleString('ru-RU', {
+        day: '2-digit', month: '2-digit', year: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      })
+    } catch {
+      return String(timestamp)
+    }
+  }
+
   import { Line } from 'svelte-chartjs'
   import {
     Chart as ChartJS,
@@ -13,10 +27,7 @@
     BubbleController,
   } from 'chart.js'
   import zoomPlugin from 'chartjs-plugin-zoom'
-  import { 
-    TrendingUp, AlertTriangle, Activity, Download, RotateCcw, 
-    ZoomIn, ZoomOut, Grid3x3, ArrowRightLeft, Table, Info, Loader2
-  } from 'lucide-svelte'
+  import { Activity, AlertTriangle, ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, ChevronDown, Circle, Download, Grid3x3, Info, Lightbulb, Loader2, RotateCcw, Table, TrendingUp, Waves, Zap, ZoomIn, ZoomOut } from 'lucide-svelte'
   import api from '../lib/api'
 
   ChartJS.register(
@@ -38,6 +49,7 @@
     analysisResult?.correlations !== undefined
   )
 
+  let expandedType = $state<string | null>(null)
   let activeTab = $state<'overview' | 'correlations' | 'table'>('overview')
   $effect(() => {
     if (isMultiTag) activeTab = 'correlations'
@@ -54,6 +66,9 @@
   let timeSeriesData = $derived(
     analysisResult?.visualizations?.time_series?.data || { labels: [], datasets: [] }
   )
+
+
+
   let correlationMatrix = $derived(analysisResult?.correlations)
 
   // Выбранная пара тегов (для scatter plot)
@@ -241,12 +256,65 @@
     }
   })
 
-  function resetZoomTs() { tsChartInstance?.resetZoom() }
-  function zoomInTs() { tsChartInstance?.zoom(1.2) }
-  function zoomOutTs() { tsChartInstance?.zoom(0.8) }
-  function resetZoomScatter() { scatterChartInstance?.resetZoom() }
-  function zoomInScatter() { scatterChartInstance?.zoom(1.2) }
-  function zoomOutScatter() { scatterChartInstance?.zoom(0.8) }
+  function resetZoomTs() {
+    try {
+      if (tsChartInstance && typeof tsChartInstance.resetZoom === 'function') {
+        tsChartInstance.resetZoom()
+      }
+    } catch (e) {
+      console.warn('Reset zoom failed:', e)
+    }
+  }
+  
+  function zoomInTs() {
+    try {
+      if (tsChartInstance && typeof tsChartInstance.zoom === 'function') {
+        tsChartInstance.zoom(1.2)
+      }
+    } catch (e) {
+      console.warn('Zoom in failed:', e)
+    }
+  }
+  
+  function zoomOutTs() {
+    try {
+      if (tsChartInstance && typeof tsChartInstance.zoom === 'function') {
+        tsChartInstance.zoom(0.8)
+      }
+    } catch (e) {
+      console.warn('Zoom out failed:', e)
+    }
+  }
+  
+  function resetZoomScatter() {
+    try {
+      if (scatterChartInstance && typeof scatterChartInstance.resetZoom === 'function') {
+        scatterChartInstance.resetZoom()
+      }
+    } catch (e) {
+      console.warn('Reset zoom scatter failed:', e)
+    }
+  }
+  
+  function zoomInScatter() {
+    try {
+      if (scatterChartInstance && typeof scatterChartInstance.zoom === 'function') {
+        scatterChartInstance.zoom(1.2)
+      }
+    } catch (e) {
+      console.warn('Zoom in scatter failed:', e)
+    }
+  }
+  
+  function zoomOutScatter() {
+    try {
+      if (scatterChartInstance && typeof scatterChartInstance.zoom === 'function') {
+        scatterChartInstance.zoom(0.8)
+      }
+    } catch (e) {
+      console.warn('Zoom out scatter failed:', e)
+    }
+  }
   
   function downloadPNG(chartInstance: ChartJS | null, prefix: string) {
     if (!chartInstance) return
@@ -439,6 +507,240 @@
 
       <!-- ==================== MULTI-TAG: CORRELATIONS ==================== -->
       {#if isMultiTag && activeTab === 'correlations'}
+        <!-- 0. Time series с аномалиями (если есть) -->
+        {#if analysisResult?.visualizations?.time_series?.data?.datasets?.length > 0}
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold">
+              Временные ряды ({analysisResult.tags.length} тегов) с аномалиями
+            </h3>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick={zoomInTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить"><ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+              <button type="button" onclick={zoomOutTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+              <button type="button" onclick={resetZoomTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+              <button type="button" onclick={() => downloadPNG(tsChartInstance, 'multitag_timeseries')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+            </div>
+          </div>
+          <div class="text-xs text-neutral-500 dark:text-neutral-400 mb-2 flex items-center gap-1.5">
+            <Lightbulb size={12} />
+            <span>Колёсико — zoom · Shift+drag — область · Drag — прокрутка</span>
+          </div>
+          <div id={tsChartId} class="h-[300px] bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700 p-3">
+            <Line data={timeSeriesData} options={timeSeriesOptions} key={analysisResult?.analysis_id || 'multitag'} />
+          </div>
+          
+          <!-- Сводка по типам аномалий -->
+          {#if analysisResult?.anomalies?.type_counts}
+            {@const tc = analysisResult.anomalies.type_counts}
+            <!-- Раскрывающаяся сводка с описаниями типов и списком значений -->
+            <div class="mt-3 space-y-2">
+              <!-- Заголовок-подсказка -->
+              <div class="text-[11px] text-neutral-600 dark:text-neutral-400 p-2 bg-neutral-50 dark:bg-neutral-800/50 rounded">
+                💡 Кликните на тип аномалии чтобы увидеть подробности и список значений
+              </div>
+
+              <!-- Пики -->
+              <details class="border border-red-200 dark:border-red-800 rounded bg-red-50 dark:bg-red-900/10" open={expandedType === 'spike'}>
+                <summary class="p-2 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition flex items-center justify-between" onclick={(e) => { e.preventDefault(); expandedType = expandedType === 'spike' ? null : 'spike'; }}>
+                  <div class="flex items-center gap-2">
+                    <ArrowUpCircle size={14} class="text-red-500" />
+                    <span class="text-sm font-semibold text-red-700 dark:text-red-300">Пики (Spike)</span>
+                    <span class="text-xs px-1.5 py-0.5 bg-red-200 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded">{tc.spike || 0}</span>
+                  </div>
+                  <span class="text-red-500 transition-transform" class:rotate-180={expandedType === 'spike'}>
+                      <ChevronDown size={14} />
+                    </span>
+                </summary>
+                <div class="p-2 border-t border-red-200 dark:border-red-800">
+                  <p class="text-[11px] text-red-700 dark:text-red-300 mb-2">
+                    <strong>Пик (Spike)</strong> — резкий одиночный скачок значения вверх относительно соседей. 
+                    Обычно вызван кратковременным сбоем датчика, электромагнитной помехой или мгновенным событием в системе.
+                    Математика: локальный z-score &gt; 1.5 (отклонение больше 1.5 стандартных отклонений от локального среднего).
+                  </p>
+                  {#if analysisResult?.anomalies?.per_tag}
+                    {#each Object.entries(analysisResult.anomalies.per_tag) as [tagName, tagData]}
+                      {@const spikePoints = (tagData.anomaly_indices || []).filter((idx, i) => (tagData.anomaly_types || [])[i] === 'spike')}
+                      {#if spikePoints.length > 0}
+                        <div class="mt-2">
+                          <div class="text-[10px] font-semibold text-red-700 dark:text-red-300 mb-1">{tagName} ({spikePoints.length}):</div>
+                          <div class="max-h-32 overflow-y-auto space-y-0.5">
+                            {#each spikePoints.slice(0, 20) as idx, i}
+                              {@const val = (tagData.anomaly_values || [])[tagData.anomaly_indices.indexOf(idx)]}
+                              <div class="text-[10px] font-mono text-red-600 dark:text-red-400 flex justify-between">
+                                <span>#{idx}</span>
+                                <span class="font-semibold">{val !== undefined ? val.toFixed(2) : '—'}</span>
+                              </div>
+                            {/each}
+                            {#if spikePoints.length > 20}
+                              <div class="text-[10px] text-red-500 italic">... и ещё {spikePoints.length - 20}</div>
+                            {/if}
+                          </div>
+                        </div>
+                      {/if}
+                    {/each}
+                  {:else if analysisResult?.anomalies?.anomaly_indices}
+                    <div class="max-h-32 overflow-y-auto space-y-0.5 mt-1">
+                      {#each analysisResult.anomalies.anomaly_indices.map((idx, i) => ({idx, val: analysisResult.anomalies.anomaly_values[i], ts: analysisResult.anomalies.anomaly_timestamps?.[i], type: analysisResult.anomalies.anomaly_types?.[i]})).filter(p => p.type === 'spike').slice(0, 30) as p}
+                        <div class="text-[10px] font-mono text-red-600 dark:text-red-400 flex justify-between gap-2">
+                          <span class="text-neutral-500">{formatAnomalyDate(p.ts)}</span>
+                          <span class="font-semibold">{p.val !== undefined && p.val !== null ? p.val.toFixed(2) : '—'}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              </details>
+
+              <!-- Провалы -->
+              <details class="border border-blue-200 dark:border-blue-800 rounded bg-blue-50 dark:bg-blue-900/10" open={expandedType === 'dip'}>
+                <summary class="p-2 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition flex items-center justify-between" onclick={(e) => { e.preventDefault(); expandedType = expandedType === 'dip' ? null : 'dip'; }}>
+                  <div class="flex items-center gap-2">
+                    <ArrowDownCircle size={14} class="text-blue-500" />
+                    <span class="text-sm font-semibold text-blue-700 dark:text-blue-300">Провалы (Dip)</span>
+                    <span class="text-xs px-1.5 py-0.5 bg-blue-200 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded">{tc.dip || 0}</span>
+                  </div>
+                  <span class="text-blue-500 transition-transform" class:rotate-180={expandedType === 'dip'}>
+                      <ChevronDown size={14} />
+                    </span>
+                </summary>
+                <div class="p-2 border-t border-blue-200 dark:border-blue-800">
+                  <p class="text-[11px] text-blue-700 dark:text-blue-300 mb-2">
+                    <strong>Провал (Dip)</strong> — резкое падение значения вниз, в том числе <strong>падение в ноль</strong>.
+                    Типичные причины: отключение датчика, обрыв связи, кратковременный сбой оборудования, потеря питания.
+                    Детектируется двумя способами: (1) падение в ноль (&lt;5% от среднего значения) — эвристика, 
+                    (2) локальный z-score &lt; -1.5 (сильное отклонение вниз).
+                  </p>
+                  {#if analysisResult?.anomalies?.zero_dips_events && analysisResult.anomalies.zero_dips_events.length > 0}
+                    <div class="mt-2 p-2 bg-blue-100 dark:bg-blue-900/30 rounded">
+                      <div class="text-[10px] font-semibold text-blue-800 dark:text-blue-200 mb-1">
+                        📉 Падения в ноль ({analysisResult.anomalies.zero_dips_events.length} событий):
+                      </div>
+                      <div class="max-h-32 overflow-y-auto space-y-0.5">
+                        {#each analysisResult.anomalies.zero_dips_events.slice(0, 20) as event}
+                          <div class="text-[10px] font-mono text-blue-700 dark:text-blue-300 flex justify-between">
+                            <span>#{event.start_idx}–#{event.end_idx}</span>
+                            <span>длит: {event.duration}</span>
+                            <span class="font-semibold">min: {event.min_value.toFixed(2)}</span>
+                          </div>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+                  {#if analysisResult?.anomalies?.per_tag}
+                    {#each Object.entries(analysisResult.anomalies.per_tag) as [tagName, tagData]}
+                      {@const dipData = (tagData.anomaly_indices || []).map((idx, i) => ({idx, val: (tagData.anomaly_values || [])[i], ts: (tagData.anomaly_timestamps || [])[i], type: (tagData.anomaly_types || [])[i]})).filter(p => p.type === 'dip')}
+                      {#if dipData.length > 0}
+                        <div class="mt-2">
+                          <div class="text-[10px] font-semibold text-blue-700 dark:text-blue-300 mb-1">{tagName} ({dipData.length}):</div>
+                          <div class="max-h-32 overflow-y-auto space-y-0.5">
+                            {#each dipData.slice(0, 20) as p}
+                              <div class="text-[10px] font-mono text-blue-600 dark:text-blue-400 flex justify-between gap-2">
+                                <span class="text-neutral-500">{formatAnomalyDate(p.ts)}</span>
+                                <span class="font-semibold">{p.val !== undefined && p.val !== null ? p.val.toFixed(2) : '—'}</span>
+                              </div>
+                            {/each}
+                            {#if dipData.length > 20}
+                              <div class="text-[10px] text-blue-500 italic">... и ещё {dipData.length - 20}</div>
+                            {/if}
+                          </div>
+                        </div>
+                      {/if}
+                    {/each}
+                  {/if}
+                </div>
+              </details>
+
+              <!-- Дрейфы -->
+              <details class="border border-amber-200 dark:border-amber-800 rounded bg-amber-50 dark:bg-amber-900/10" open={expandedType === 'drift'}>
+                <summary class="p-2 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition flex items-center justify-between" onclick={(e) => { e.preventDefault(); expandedType = expandedType === 'drift' ? null : 'drift'; }}>
+                  <div class="flex items-center gap-2">
+                    <Waves size={14} class="text-amber-500" />
+                    <span class="text-sm font-semibold text-amber-700 dark:text-amber-300">Дрейфы (Drift)</span>
+                    <span class="text-xs px-1.5 py-0.5 bg-amber-200 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 rounded">{tc.drift || 0}</span>
+                  </div>
+                  <span class="text-amber-500 transition-transform" class:rotate-180={expandedType === 'drift'}>
+                      <ChevronDown size={14} />
+                    </span>
+                </summary>
+                <div class="p-2 border-t border-amber-200 dark:border-amber-800">
+                  <p class="text-[11px] text-amber-700 dark:text-amber-300 mb-2">
+                    <strong>Дрейф (Drift)</strong> — постепенное монотонное смещение уровня сигнала от нормы.
+                    В отличие от пика (резкий скачок), дрейф развивается во времени — значение медленно уходит вверх или вниз.
+                    Типичные причины: старение датчика, засорение, калибровочный сдвиг, накопление отложений.
+                    Математика: минимум 5 подряд идущих аномальных точек + монотонность (&gt;75% в одну сторону) + R² линейного тренда &gt; 0.6.
+                  </p>
+                  {#if analysisResult?.anomalies?.per_tag}
+                    {#each Object.entries(analysisResult.anomalies.per_tag) as [tagName, tagData]}
+                      {@const driftData = (tagData.anomaly_indices || []).map((idx, i) => ({idx, val: (tagData.anomaly_values || [])[i], ts: (tagData.anomaly_timestamps || [])[i], type: (tagData.anomaly_types || [])[i]})).filter(p => p.type === 'drift')}
+                      {#if driftData.length > 0}
+                        <div class="mt-2">
+                          <div class="text-[10px] font-semibold text-amber-700 dark:text-amber-300 mb-1">{tagName} ({driftData.length}):</div>
+                          <div class="max-h-32 overflow-y-auto space-y-0.5">
+                            {#each driftData.slice(0, 20) as p}
+                              <div class="text-[10px] font-mono text-amber-600 dark:text-amber-400 flex justify-between gap-2">
+                                <span class="text-neutral-500">{formatAnomalyDate(p.ts)}</span>
+                                <span class="font-semibold">{p.val !== undefined && p.val !== null ? p.val.toFixed(2) : '—'}</span>
+                              </div>
+                            {/each}
+                            {#if driftData.length > 20}
+                              <div class="text-[10px] text-amber-500 italic">... и ещё {driftData.length - 20}</div>
+                            {/if}
+                          </div>
+                        </div>
+                      {/if}
+                    {/each}
+                  {/if}
+                </div>
+              </details>
+
+              <!-- Шум -->
+              <details class="border border-neutral-200 dark:border-neutral-700 rounded bg-neutral-50 dark:bg-neutral-800/50" open={expandedType === 'noise'}>
+                <summary class="p-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition flex items-center justify-between" onclick={(e) => { e.preventDefault(); expandedType = expandedType === 'noise' ? null : 'noise'; }}>
+                  <div class="flex items-center gap-2">
+                    <Zap size={14} class="text-neutral-500" />
+                    <span class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Шум (Noise)</span>
+                    <span class="text-xs px-1.5 py-0.5 bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200 rounded">{tc.noise || 0}</span>
+                  </div>
+                  <span class="text-neutral-500 transition-transform" class:rotate-180={expandedType === 'noise'}>
+                      <ChevronDown size={14} />
+                    </span>
+                </summary>
+                <div class="p-2 border-t border-neutral-200 dark:border-neutral-700">
+                  <p class="text-[11px] text-neutral-700 dark:text-neutral-300 mb-2">
+                    <strong>Шум (Noise)</strong> — быстрые хаотичные колебания значения без выраженного тренда.
+                    В отличие от дрейфа (монотонный уход) или пика (одиночный выброс), шум — это беспорядочные 
+                    колебания вокруг некоторого уровня. Типичные причины: электромагнитные помехи, плохой контакт,
+                    вибрация, квантование АЦП, флуктуации процесса.
+                    Математика: высокая производная (быстрые скачки) + низкий R² (нет линейного тренда).
+                  </p>
+                  {#if analysisResult?.anomalies?.per_tag}
+                    {#each Object.entries(analysisResult.anomalies.per_tag) as [tagName, tagData]}
+                      {@const noiseData = (tagData.anomaly_indices || []).map((idx, i) => ({idx, val: (tagData.anomaly_values || [])[i], ts: (tagData.anomaly_timestamps || [])[i], type: (tagData.anomaly_types || [])[i]})).filter(p => p.type === 'noise')}
+                      {#if noiseData.length > 0}
+                        <div class="mt-2">
+                          <div class="text-[10px] font-semibold text-neutral-700 dark:text-neutral-300 mb-1">{tagName} ({noiseData.length}):</div>
+                          <div class="max-h-32 overflow-y-auto space-y-0.5">
+                            {#each noiseData.slice(0, 20) as p}
+                              <div class="text-[10px] font-mono text-neutral-600 dark:text-neutral-400 flex justify-between gap-2">
+                                <span class="text-neutral-500">{formatAnomalyDate(p.ts)}</span>
+                                <span class="font-semibold">{p.val !== undefined && p.val !== null ? p.val.toFixed(2) : '—'}</span>
+                              </div>
+                            {/each}
+                            {#if noiseData.length > 20}
+                              <div class="text-[10px] text-neutral-500 italic">... и ещё {noiseData.length - 20}</div>
+                            {/if}
+                          </div>
+                        </div>
+                      {/if}
+                    {/each}
+                  {/if}
+                </div>
+              </details>
+            </div>
+          {/if}
+        </div>
+        {/if}
+        
         <!-- 1. Матрица корреляций (кликабельная!) -->
         <div class="mb-4">
           <h3 class="text-sm font-semibold mb-2 flex items-center gap-2">
@@ -489,11 +791,20 @@
               </table>
             </div>
             
-            <div class="text-[10px] text-neutral-500 dark:text-neutral-400 mt-1 flex items-center gap-3">
-              <span>🔵 положительная</span>
-              <span>🔴 отрицательная</span>
+            <div class="text-[10px] text-neutral-500 dark:text-neutral-400 mt-1 flex items-center gap-3 flex-wrap">
+              <span class="flex items-center gap-1">
+                <Circle size={10} class="fill-blue-500 text-blue-500" />
+                положительная
+              </span>
+              <span class="flex items-center gap-1">
+                <Circle size={10} class="fill-red-500 text-red-500" />
+                отрицательная
+              </span>
               <span>•</span>
-              <span>🟦 рамка = выбранная пара</span>
+              <span class="flex items-center gap-1">
+                <div class="w-2.5 h-2.5 border-2 border-blue-600 dark:border-blue-400"></div>
+                выбранная пара
+              </span>
               <span>•</span>
               <span>Кликните на ячейку для scatter plot</span>
             </div>

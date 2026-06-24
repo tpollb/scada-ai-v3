@@ -1,37 +1,29 @@
 name: deep_analysis
-version: 0.1.0
-description: Глубокий анализ тегов — статистика, аномалии, корреляции, сезонность
+version: 0.3.0
+description: Глубокий анализ данных — аномалии, корреляции, статистика
 enabled: true
-
-# Доступные периоды для анализа
-available_periods: [7, 30, 120, 365]
-
-# Опции анализа (можно включать/выключать)
-analysis_options:
-  anomalies: true        # Isolation Forest + K-Means
-  correlations: true     # Pearson + Mutual Information + Granger
-  seasonality: true      # FFT для циклов
-  compare_periods: true  # A/B сравнение
-
-# Форматы экспорта
-export_formats:
-  - pdf
-  - excel
-  - csv
-
-# Папка для хранения истории анализов
-history_dir: "data/analysis_history"
-
-# Максимальное количество точек для анализа (downsampling)
-max_points: 50000
-
-# Параметры для Isolation Forest
-isolation_forest:
-  contamination: 0.05    # предполагаемый % аномалий
-  n_estimators: 100      # количество деревьев
-
-# Параметры для FFT
-fft:
-  min_period_hours: 1    # минимальный период для детекции
-  max_period_hours: 168  # максимальный период (неделя)
-  significance_threshold: 0.1  # порог значимости пика
+anomaly_detection:
+  contamination: 0.06
+  n_estimators: 100
+  spike_threshold: 2.0
+  dip_threshold: 2.0
+  drift_min_duration: 3
+  drift_min_r_squared: 0.4
+  drift_min_relative_change: 0.03
+  plateau_tolerance: 0.02
+  local_window: 24
+  significant_dip_ratio: 0.3
+  zero_threshold_ratio: 0.05
+correlations:
+  resample_freq: 5min
+  pearson_threshold: 0.3
+  max_lag: 50
+visualization:
+  max_points: 1500
+  anomaly_point_radius: 6
+  drift_line_width: 2
+colors:
+  spike: '#ef4444'
+  dip: '#3b82f6'
+  drift: '#f59e0b'
+  noise: '#9ca3af'
