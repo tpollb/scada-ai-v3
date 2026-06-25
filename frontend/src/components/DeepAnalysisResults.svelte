@@ -496,7 +496,7 @@
             </div>
           </div>
           <div id={tsChartId} class="h-[300px] bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700 p-3">
-            {#if timeSeriesData.labels.length > 0}
+            {#if timeSeriesData?.labels?.length > 0}
               <Line data={timeSeriesData} options={timeSeriesOptions} key={analysisResult?.analysis_id || 'default'} />
             {:else}
               <div class="flex items-center justify-center h-full text-sm text-neutral-400">Нет данных</div>

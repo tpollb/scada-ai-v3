@@ -76,36 +76,23 @@ def create_time_series_spec(
     values: list[float],
     tag_name: str,
     anomalies: Optional[dict] = None,
-    max_points: int = 1500,
+    max_points: int = 3000,
 ) -> dict:
     """
-    Создаёт JSON-спецификацию для time series графика с цветовой кодировкой аномалий.
+    Создаёт JSON-спецификацию для time series графика.
     
-    Применяет min-max downsampling к основному ряду для производительности.
-    Аномалии (scatter points) не даунсемплятся — их обычно немного.
+    ВСЕ датасеты используют единый index-based формат для корректной работы
+    с Chart.js category шкалой и tooltip mode: 'index'.
     """
-    # Downsampling основного ряда через min-max
-    need_downsample = len(values) > max_points
+    from datetime import datetime
     
+    # Downsampling основного ряда
+    need_downsample = len(values) > max_points
     if need_downsample:
         ds_values, ds_timestamps = downsample_time_series(values, timestamps, max_points)
-        
-        # Строим маппинг: original_idx -> downsampled_idx
-        # Это нужно чтобы правильно позиционировать аномалии
-        bucket_size = len(values) / max_points
-        idx_map = {}
-        for orig_idx in range(len(values)):
-            ds_idx = int(orig_idx / bucket_size)
-            if ds_idx >= max_points:
-                ds_idx = max_points - 1
-            # Для каждой точки находим ближайший downsampled индекс
-            # Берём минимальный ds_idx чтобы аномалии не "уезжали" вперёд
-            if orig_idx not in idx_map:
-                idx_map[orig_idx] = min(ds_idx, len(ds_values) - 1)
     else:
         ds_values = values
         ds_timestamps = timestamps
-        idx_map = {i: i for i in range(len(values))}
     
     # Форматируем labels
     labels = []
@@ -113,11 +100,22 @@ def create_time_series_spec(
         if isinstance(ts, datetime):
             labels.append(ts.strftime("%Y-%m-%d %H:%M"))
         else:
-            labels.append(str(ts))
+            ts_str = str(ts).replace('T', ' ')
+            labels.append(ts_str[:16] if len(ts_str) > 16 else ts_str)
+    
+    # Создаём маппинг: timestamp → index в downsampled массиве
+    ts_to_index = {}
+    for idx, ts in enumerate(ds_timestamps):
+        if isinstance(ts, datetime):
+            ts_key = ts.strftime("%Y-%m-%d %H:%M")
+        else:
+            ts_str = str(ts).replace('T', ' ')
+            ts_key = ts_str[:16] if len(ts_str) > 16 else ts_str
+        ts_to_index[ts_key] = idx
     
     datasets = []
     
-    # Основной ряд данных (downsampled)
+    # Основной ряд данных (index-based)
     datasets.append({
         "label": tag_name,
         "data": ds_values,
@@ -130,68 +128,84 @@ def create_time_series_spec(
         "fill": False,
     })
     
-    # Если есть аномалии — добавляем scatter datasets по типам
+    # Index-based scatter для аномалий
     if anomalies and anomalies.get('anomaly_indices'):
-        anomaly_types = anomalies.get('anomaly_types', [])
+        anomaly_types_list = anomalies.get('anomaly_types', [])
+        anomaly_timestamps = anomalies.get('anomaly_timestamps', [])
+        anomaly_values = anomalies.get('anomaly_values', [])
         
         type_colors = {
             "spike": {"color": "#ef4444", "label": "Пики (Spike)"},
             "dip": {"color": "#3b82f6", "label": "Провалы (Dip)"},
             "drift": {"color": "#f59e0b", "label": "Дрейфы (Drift)"},
             "noise": {"color": "#9ca3af", "label": "Шум (Noise)"},
-            "unknown": {"color": "#ef4444", "label": "Аномалии"},
         }
         
-        # Группируем аномалии по типам с пересчётом индексов
+        # Группируем аномалии по типам
         anomalies_by_type = {}
-        for idx, val, atype in zip(
-            anomalies['anomaly_indices'],
-            anomalies['anomaly_values'],
-            anomaly_types
-        ):
+        for val, atype, ts in zip(anomaly_values, anomaly_types_list, anomaly_timestamps):
             if atype not in anomalies_by_type:
                 anomalies_by_type[atype] = []
-            
-            # Пересчитываем индекс под downsampled данные
-            ds_idx = idx_map.get(idx, idx)
-            anomalies_by_type[atype].append((ds_idx, val))
+            anomalies_by_type[atype].append((val, ts))
         
         for atype, points in anomalies_by_type.items():
-            color_info = type_colors.get(atype, type_colors["unknown"])
+            color_info = type_colors.get(atype, type_colors.get("noise"))
             
+            # Index-based scatter: массив с None, значения только на нужных индексах
             type_data = [None] * len(ds_values)
-            for ds_idx, val in points:
-                if 0 <= ds_idx < len(type_data):
-                    type_data[ds_idx] = val
             
-            # Дрейф рисуем ЛИНИЕЙ (пунктир), остальные — точками
-            if atype == "drift":
-                datasets.append({
-                    "label": color_info["label"],
-                    "data": type_data,
-                    "borderColor": color_info["color"],
-                    "backgroundColor": color_info["color"],
-                    "type": "line",
-                    "borderWidth": 2,
-                    "borderDash": [6, 3],
-                    "pointRadius": 3,
-                    "pointHoverRadius": 5,
-                    "showLine": True,
-                    "spanGaps": True,
-                })
-            else:
-                datasets.append({
-                    "label": color_info["label"],
-                    "data": type_data,
-                    "borderColor": color_info["color"],
-                    "backgroundColor": color_info["color"],
-                    "type": "scatter",
-                    "pointRadius": 6,
-                    "pointHoverRadius": 8,
-                    "showLine": False,
-                })
+            for val, orig_ts in points:
+                # Форматируем timestamp аномалии
+                if isinstance(orig_ts, datetime):
+                    ts_key = orig_ts.strftime("%Y-%m-%d %H:%M")
+                else:
+                    ts_str = str(orig_ts).replace('T', ' ')
+                    ts_key = ts_str[:16] if len(ts_str) > 16 else ts_str
+                
+                # Ищем индекс в downsampled массиве
+                if ts_key in ts_to_index:
+                    ds_idx = ts_to_index[ts_key]
+                    type_data[ds_idx] = val
+                else:
+                    # Если точного совпадения нет — ищем ближайший timestamp
+                    try:
+                        if isinstance(orig_ts, datetime):
+                            orig_ts_dt = orig_ts
+                        else:
+                            ts_str = str(orig_ts).replace('T', ' ')
+                            if len(ts_str) > 16:
+                                ts_str = ts_str[:16]
+                            orig_ts_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M")
+                        
+                        min_diff = float('inf')
+                        closest_idx = None
+                        
+                        for i, ds_ts in enumerate(ds_timestamps):
+                            if isinstance(ds_ts, datetime):
+                                diff = abs((ds_ts - orig_ts_dt).total_seconds())
+                                if diff < min_diff:
+                                    min_diff = diff
+                                    closest_idx = i
+                        
+                        # Если разница меньше 30 минут — используем этот индекс
+                        if closest_idx is not None and min_diff < 1800:
+                            type_data[closest_idx] = val
+                    except Exception:
+                        pass
+            
+            # Все типы рисуем как scatter (точки)
+            datasets.append({
+                "label": color_info["label"],
+                "data": type_data,
+                "borderColor": color_info["color"],
+                "backgroundColor": color_info["color"],
+                "type": "scatter",
+                "pointRadius": 6,
+                "pointHoverRadius": 8,
+                "showLine": False,
+            })
     
-    spec = {
+    return {
         "type": "line",
         "data": {
             "labels": labels,
@@ -201,50 +215,24 @@ def create_time_series_spec(
             "responsive": True,
             "maintainAspectRatio": False,
             "plugins": {
-                "legend": {
-                    "display": True,
-                    "position": "top",
-                    "labels": {"font": {"size": 11}, "boxWidth": 12},
-                },
+                "legend": {"display": True, "position": "top"},
                 "tooltip": {
                     "mode": "index",
                     "intersect": False,
                 },
-                "zoom": {
-                    "pan": {"enabled": True, "mode": "x"},
-                    "zoom": {
-                        "wheel": {"enabled": True, "speed": 0.05},
-                        "pinch": {"enabled": True},
-                        "drag": {
-                            "enabled": True,
-                            "modifierKey": "shift",
-                            "backgroundColor": "rgba(59, 130, 246, 0.1)",
-                        },
-                        "mode": "x",
-                    },
-                },
             },
             "scales": {
                 "x": {
+                    "type": "category",
                     "display": True,
-                    "grid": {"display": False},
-                    "ticks": {"maxTicksLimit": 10, "font": {"size": 10}},
+                    "ticks": {"maxTicksLimit": 10},
                 },
                 "y": {
                     "display": True,
-                    "grid": {"color": "rgba(0, 0, 0, 0.05)"},
-                    "ticks": {"font": {"size": 10}},
                 },
-            },
-            "interaction": {
-                "mode": "nearest",
-                "axis": "x",
-                "intersect": False,
             },
         },
     }
-    
-    return spec
 
 
 
@@ -430,7 +418,7 @@ def create_multitag_time_series_spec(
     tags_data: dict,
     common_timestamps: list,
     anomalies_per_tag: dict = None,
-    max_points: int = 800,
+    max_points: int = 3000,
 ) -> dict:
     """
     Создаёт time series spec для мульти-тег графика с downsampling.

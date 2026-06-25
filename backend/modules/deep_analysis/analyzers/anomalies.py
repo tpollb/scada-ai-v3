@@ -182,7 +182,7 @@ def detect_anomalies_isolation_forest(
     zero_indices_set = set(zero_dips['anomaly_indices'])
     
     # Significant dips (значительные падения, не обязательно в ноль)
-    sig_dips = detect_significant_dips(values, timestamps, drop_ratio=0.30, min_duration=2)
+    sig_dips = detect_significant_dips(values, timestamps, drop_ratio=None, min_duration=2)  # None = читать из конфига
     sig_dip_indices_set = set(sig_dips['anomaly_indices'])
     
     # Объединяем — добавляем пропущенные zero/significant dips
@@ -516,6 +516,15 @@ def classify_anomaly_types(
         
         # === КЛАССИФИКАЦИЯ ===
         
+
+        # Проверка на stuck sensor: если все значения одинаковые и длительность > 60 мин
+        # Это застывший датчик — НЕ аномалия, исключаем
+        if is_flat and duration >= 12:  # 12 точек * 5 мин = 60 мин
+            # Помечаем как noise (чтобы не засчитывалось как аномалия)
+            for idx in indices:
+                types_map[idx] = "noise"
+            continue
+
         if duration == 1:
             # Одиночная точка
             if is_flat:

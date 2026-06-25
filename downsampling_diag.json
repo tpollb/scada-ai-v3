@@ -1,0 +1,350 @@
+{
+    "tag_name": "KITCHEN2-CO2",
+    "period_days": 30,
+    "raw_data": {
+        "total_points": 7813,
+        "valid_points": 7813,
+        "null_points": 0,
+        "null_percent": 0.0,
+        "first_timestamp": "2026-05-28T04:54:02",
+        "last_timestamp": "2026-06-24T07:28:05"
+    },
+    "anomalies_detected": {
+        "total": 490,
+        "type_counts": {
+            "dip": 27,
+            "noise": 449,
+            "spike": 11,
+            "drift": 3
+        },
+        "rate": 0.06271598617688467
+    },
+    "downsampling": {
+        "original_points": 7813,
+        "downsampled_points": 2185,
+        "compression_ratio": 3.58,
+        "bucket_size": 5.21
+    },
+    "anomaly_mapping_sample": [
+        {
+            "type": "dip",
+            "orig_idx": 0,
+            "orig_value": 0.0,
+            "orig_timestamp": "2026-05-28T04:54:02",
+            "ds_idx_approx": 0,
+            "ds_value": 0.0,
+            "ds_timestamp": "2026-05-28T04:54:02",
+            "value_diff": 0.0,
+            "bucket_range": [
+                0,
+                6
+            ]
+        },
+        {
+            "type": "dip",
+            "orig_idx": 1,
+            "orig_value": 0.0,
+            "orig_timestamp": "2026-05-28T04:57:58",
+            "ds_idx_approx": 0,
+            "ds_value": 0.0,
+            "ds_timestamp": "2026-05-28T04:54:02",
+            "value_diff": 0.0,
+            "bucket_range": [
+                0,
+                6
+            ]
+        },
+        {
+            "type": "dip",
+            "orig_idx": 74,
+            "orig_value": 0.0,
+            "orig_timestamp": "2026-05-28T10:57:24",
+            "ds_idx_approx": 14,
+            "ds_value": 414.0,
+            "ds_timestamp": "2026-05-28T07:44:40",
+            "value_diff": 414.0,
+            "bucket_range": [
+                70,
+                76
+            ]
+        },
+        {
+            "type": "dip",
+            "orig_idx": 75,
+            "orig_value": 0.0,
+            "orig_timestamp": "2026-05-28T10:57:41",
+            "ds_idx_approx": 14,
+            "ds_value": 414.0,
+            "ds_timestamp": "2026-05-28T07:44:40",
+            "value_diff": 414.0,
+            "bucket_range": [
+                70,
+                76
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1196,
+            "orig_value": 744.0,
+            "orig_timestamp": "2026-06-01T08:08:38",
+            "ds_idx_approx": 229,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T02:24:13",
+            "value_diff": 220.0,
+            "bucket_range": [
+                1145,
+                1151
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1197,
+            "orig_value": 731.0,
+            "orig_timestamp": "2026-06-01T08:13:38",
+            "ds_idx_approx": 229,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T02:24:13",
+            "value_diff": 207.0,
+            "bucket_range": [
+                1145,
+                1151
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1200,
+            "orig_value": 721.0,
+            "orig_timestamp": "2026-06-01T08:28:38",
+            "ds_idx_approx": 230,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T02:49:13",
+            "value_diff": 197.0,
+            "bucket_range": [
+                1150,
+                1156
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1202,
+            "orig_value": 706.0,
+            "orig_timestamp": "2026-06-01T08:38:38",
+            "ds_idx_approx": 230,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T02:49:13",
+            "value_diff": 182.0,
+            "bucket_range": [
+                1150,
+                1156
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1203,
+            "orig_value": 740.0,
+            "orig_timestamp": "2026-06-01T08:43:38",
+            "ds_idx_approx": 230,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T02:49:13",
+            "value_diff": 216.0,
+            "bucket_range": [
+                1150,
+                1156
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1204,
+            "orig_value": 751.0,
+            "orig_timestamp": "2026-06-01T08:48:38",
+            "ds_idx_approx": 231,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T03:19:14",
+            "value_diff": 227.0,
+            "bucket_range": [
+                1155,
+                1161
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1205,
+            "orig_value": 762.0,
+            "orig_timestamp": "2026-06-01T08:53:38",
+            "ds_idx_approx": 231,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T03:19:14",
+            "value_diff": 238.0,
+            "bucket_range": [
+                1155,
+                1161
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1206,
+            "orig_value": 751.0,
+            "orig_timestamp": "2026-06-01T08:58:38",
+            "ds_idx_approx": 231,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T03:19:14",
+            "value_diff": 227.0,
+            "bucket_range": [
+                1155,
+                1161
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1207,
+            "orig_value": 752.0,
+            "orig_timestamp": "2026-06-01T09:03:38",
+            "ds_idx_approx": 231,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T03:19:14",
+            "value_diff": 228.0,
+            "bucket_range": [
+                1155,
+                1161
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1208,
+            "orig_value": 763.0,
+            "orig_timestamp": "2026-06-01T09:08:38",
+            "ds_idx_approx": 231,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T03:19:14",
+            "value_diff": 239.0,
+            "bucket_range": [
+                1155,
+                1161
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1209,
+            "orig_value": 708.0,
+            "orig_timestamp": "2026-06-01T09:13:38",
+            "ds_idx_approx": 232,
+            "ds_value": 524.0,
+            "ds_timestamp": "2026-05-31T03:44:14",
+            "value_diff": 184.0,
+            "bucket_range": [
+                1160,
+                1166
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1217,
+            "orig_value": 719.0,
+            "orig_timestamp": "2026-06-01T09:53:38",
+            "ds_idx_approx": 233,
+            "ds_value": 513.0,
+            "ds_timestamp": "2026-05-31T04:09:14",
+            "value_diff": 206.0,
+            "bucket_range": [
+                1165,
+                1171
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1218,
+            "orig_value": 719.0,
+            "orig_timestamp": "2026-06-01T09:58:38",
+            "ds_idx_approx": 233,
+            "ds_value": 513.0,
+            "ds_timestamp": "2026-05-31T04:09:14",
+            "value_diff": 206.0,
+            "bucket_range": [
+                1165,
+                1171
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1219,
+            "orig_value": 707.0,
+            "orig_timestamp": "2026-06-01T10:03:38",
+            "ds_idx_approx": 234,
+            "ds_value": 513.0,
+            "ds_timestamp": "2026-05-31T04:34:14",
+            "value_diff": 194.0,
+            "bucket_range": [
+                1170,
+                1176
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1226,
+            "orig_value": 729.0,
+            "orig_timestamp": "2026-06-01T10:38:38",
+            "ds_idx_approx": 235,
+            "ds_value": 502.0,
+            "ds_timestamp": "2026-05-31T04:59:14",
+            "value_diff": 227.0,
+            "bucket_range": [
+                1175,
+                1181
+            ]
+        },
+        {
+            "type": "noise",
+            "orig_idx": 1227,
+            "orig_value": 762.0,
+            "orig_timestamp": "2026-06-01T10:43:38",
+            "ds_idx_approx": 235,
+            "ds_value": 502.0,
+            "ds_timestamp": "2026-05-31T04:59:14",
+            "value_diff": 260.0,
+            "bucket_range": [
+                1175,
+                1181
+            ]
+        }
+    ],
+    "potential_drifts": [
+        {
+            "start_idx": 3285,
+            "end_idx": 3315,
+            "start_timestamp": "2026-06-08T14:14:04",
+            "end_timestamp": "2026-06-08T16:39:04",
+            "start_value": 738.0,
+            "end_value": 496.0,
+            "r_squared": 0.9541330926064577,
+            "monotonic_ratio": 0.6551724137931034,
+            "change_percent": 32.791327913274685
+        },
+        {
+            "start_idx": 1830,
+            "end_idx": 1860,
+            "start_timestamp": "2026-06-03T12:58:46",
+            "end_timestamp": "2026-06-03T15:23:47",
+            "start_value": 884.0,
+            "end_value": 539.0,
+            "r_squared": 0.9496974029850526,
+            "monotonic_ratio": 0.6896551724137931,
+            "change_percent": 39.02714932126255
+        },
+        {
+            "start_idx": 3540,
+            "end_idx": 3570,
+            "start_timestamp": "2026-06-09T11:27:16",
+            "end_timestamp": "2026-06-09T13:52:16",
+            "start_value": 840.0,
+            "end_value": 540.0,
+            "r_squared": 0.8207556333120841,
+            "monotonic_ratio": 0.6206896551724138,
+            "change_percent": 35.714285714281466
+        }
+    ],
+    "summary": {
+        "null_affects_analysis": false,
+        "downsampling_loses_anomalies": true,
+        "drifts_found_but_not_classified": false
+    }
+}

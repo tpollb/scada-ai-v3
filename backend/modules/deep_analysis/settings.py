@@ -16,16 +16,16 @@ class AnomalyDetectionSettings(BaseModel):
     n_estimators: int = Field(100, ge=10, le=500, description="Количество деревьев")
     
     spike_threshold: float = Field(2.0, ge=1.0, le=5.0, description="Z-score для пика")
-    dip_threshold: float = Field(2.0, ge=1.0, le=5.0, description="Z-score для провала")
+    dip_threshold: float = Field(3.0, ge=1.0, le=5.0, description="Z-score для провала")
     
     drift_min_duration: int = Field(3, ge=2, le=20, description="Мин. точек для дрейфа")
-    drift_min_r_squared: float = Field(0.4, ge=0.1, le=0.95, description="Качество тренда")
-    drift_min_relative_change: float = Field(0.03, ge=0.01, le=0.20, description="Мин. изменение")
+    drift_min_r_squared: float = Field(0.3, ge=0.1, le=0.95, description="Качество тренда")
+    drift_min_relative_change: float = Field(0.02, ge=0.01, le=0.20, description="Мин. изменение")
     
     plateau_tolerance: float = Field(0.02, ge=0.001, le=0.10, description="Порог плато")
     local_window: int = Field(24, ge=5, le=100, description="Окно локальной статистики")
     
-    significant_dip_ratio: float = Field(0.30, ge=0.10, le=0.80, description="Порог значительного провала")
+    significant_dip_ratio: float = Field(0.50, ge=0.10, le=0.80, description="Порог значительного провала")
     zero_threshold_ratio: float = Field(0.05, ge=0.01, le=0.20, description="Порог нуля")
 
 
@@ -38,7 +38,7 @@ class CorrelationsSettings(BaseModel):
 
 class VisualizationSettings(BaseModel):
     """Настройки визуализации"""
-    max_points: int = Field(1500, ge=200, le=5000, description="Downsampling для графиков")
+    max_points: int = Field(3000, ge=500, le=10000, description="Downsampling для графиков")
     anomaly_point_radius: int = Field(6, ge=2, le=15, description="Размер точек аномалий")
     drift_line_width: int = Field(2, ge=1, le=5, description="Толщина линии дрейфа")
 
