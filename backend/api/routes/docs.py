@@ -17,6 +17,7 @@ ALLOWED_FILES = [
     "ARCHITECTURE.md",
     "CHANGELOG.md",
     "ANALYTICS.md",
+    "DDA.md",
 ]
 
 

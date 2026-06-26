@@ -1,4 +1,4 @@
-# SCADA.AI Analytics Engine — Техническая документация
+# Analytics Engine
 
 **Версия:** 3.2.0  
 **Модуль:** `backend/modules/analytics/`  
