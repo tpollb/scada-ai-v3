@@ -231,7 +231,7 @@ async def run_analysis(request: AnalysisRequest):
                     adaptive_contamination = min(0.15, max(0.08, 200 / max(len(valid_values), 1)))
                     tag_anomalies = detect_anomalies_isolation_forest(
                         valid_values,
-                        list(range(len(valid_values))),
+                        [data["common_timestamps"][j] for j in range(len(aligned_values)) if j < len(aligned_values) and aligned_values[j] is not None],
                         contamination=adaptive_contamination,  # псевдо-timestamps (индексы)
                         classify_types=True
                     )

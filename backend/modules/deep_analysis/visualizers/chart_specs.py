@@ -1,10 +1,34 @@
 """Создание JSON-спецификаций для графиков Chart.js"""
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import numpy as np
 from structlog import get_logger
+from config.settings import settings
 
 log = get_logger()
+
+# Получаем таймзону из конфига
+try:
+    import pytz
+    LOCAL_TZ = pytz.timezone(settings.timezone)
+except Exception:
+    LOCAL_TZ = timezone.utc
+
+
+def apply_timezone(ts):
+    """Применяет локальную таймзону к timestamp."""
+    if isinstance(ts, datetime):
+        if ts.tzinfo is None:
+            try:
+                return LOCAL_TZ.localize(ts)
+            except Exception:
+                return ts
+        else:
+            try:
+                return ts.astimezone(LOCAL_TZ)
+            except Exception:
+                return ts
+    return ts
 
 
 def downsample_time_series(values: list, timestamps: list, target_points: int = 800) -> tuple[list, list]:
@@ -421,175 +445,116 @@ def create_multitag_time_series_spec(
     max_points: int = 3000,
 ) -> dict:
     """
-    Создаёт time series spec для мульти-тег графика с downsampling.
-    
-    Показывает:
-    - Линии для каждого тега (разные цвета, downsampled до max_points)
-    - Scatter points для аномалий с цветовой кодировкой по типам
-    
-    Args:
-        tags_data: {tag_name: {"aligned_values": [...], ...}, ...}
-        common_timestamps: общие timestamps
-        anomalies_per_tag: {tag_name: {"anomaly_indices": [...], "anomaly_types": [...], ...}, ...}
-        max_points: максимальное количество точек (по умолчанию 800 для производительности)
+    Multi-tag: просто вызываем create_time_series_spec для каждого тега.
+    Если single-tag работает — повторяем его механизм.
     """
-    datasets = []
-    
-    tag_colors = [
+    if not anomalies_per_tag:
+        anomalies_per_tag = {}
+
+    all_datasets = []
+    first_labels = None
+
+    # Цвета для линий тегов
+    tag_line_colors = [
         "#3b82f6", "#10b981", "#f59e0b", "#ef4444",
         "#8b5cf6", "#ec4899", "#14b8a6", "#f97316",
     ]
-    
-    type_colors = {
-        "spike": {"color": "#ef4444", "label": "Пики"},
-        "dip": {"color": "#3b82f6", "label": "Провалы"},
-        "drift": {"color": "#f59e0b", "label": "Дрейфы"},
-        "noise": {"color": "#9ca3af", "label": "Шум"},
+
+    # Цвета для аномалий (ОДИНАКОВЫЕ для всех тегов)
+    anomaly_colors = {
+        "spike": {"color": "#ef4444", "label": "Пики (Spike)"},
+        "dip": {"color": "#3b82f6", "label": "Провалы (Dip)"},
+        "drift": {"color": "#f59e0b", "label": "Дрейфы (Drift)"},
+        "noise": {"color": "#9ca3af", "label": "Шум (Noise)"},
     }
-    
-    # Downsampling
-    need_downsample = len(common_timestamps) > max_points
-    
-    if need_downsample:
-        # ВНИМАНИЕ: downsample_time_series возвращает (values, timestamps)
-        _, ds_timestamps = downsample_time_series(
-            list(range(len(common_timestamps))),
-            common_timestamps,
-            max_points
-        )
-        ds_timestamps = [t for t in ds_timestamps if t is not None]
-    else:
-        ds_timestamps = common_timestamps
-    
-    # Форматируем labels (строковое представление timestamps)
-    labels = []
-    for ts in ds_timestamps:
-        if isinstance(ts, datetime):
-            labels.append(ts.strftime("%Y-%m-%d %H:%M"))
-        else:
-            labels.append(str(ts))
-    
-    # Отладка: логируем первые и последние labels
-    if labels:
-        log.debug(
-            "Time series labels",
-            total=len(labels),
-            first=labels[0] if labels else None,
-            last=labels[-1] if labels else None
-        )
-    
-    # 1. Добавляем линии для каждого тега (с downsampling)
+
+    # Для каждого тега вызываем create_time_series_spec
     for i, (tag_name, tag_data) in enumerate(tags_data.items()):
         aligned_values = tag_data.get('aligned_values', [])
-        color = tag_colors[i % len(tag_colors)]
-        
-        if need_downsample:
-            ds_values, _ = downsample_time_series(aligned_values, common_timestamps, max_points)
-        else:
-            ds_values = aligned_values
-        
-        datasets.append({
-            "label": tag_name,
-            "data": ds_values,
-            "borderColor": color,
-            "backgroundColor": color,
-            "type": "line",
-            "borderWidth": 1.5,
-            "pointRadius": 0,
-            "pointHoverRadius": 4,
-            "tension": 0.1,
-            "fill": False,
-        })
-    
-    # 2. Добавляем scatter points для аномалий по типам
-    if anomalies_per_tag:
-        anomalies_by_type = {}
-        
-        bucket_size = len(common_timestamps) / max_points if need_downsample else 1.0
-        
-        for tag_name, tag_anomalies in anomalies_per_tag.items():
-            indices = tag_anomalies.get('anomaly_indices', [])
-            types = tag_anomalies.get('anomaly_types', [])
-            aligned_values = tags_data[tag_name].get('aligned_values', [])
-            
-            # Сопоставляем индексы (с учётом None в aligned_values)
+        tag_anomalies_raw = anomalies_per_tag.get(tag_name)
+
+        # ВАЖНО: преобразуем индексы аномалий из valid_values в aligned_values
+        # Потому что в API детекция идёт на отфильтрованных значениях
+        tag_anomalies = None
+        if tag_anomalies_raw and tag_anomalies_raw.get('anomaly_indices'):
+            # Создаём маппинг: valid_idx → aligned_idx
             valid_idx = 0
             idx_map = {}
-            for i, v in enumerate(aligned_values):
+            for aligned_idx, v in enumerate(aligned_values):
                 if v is not None:
-                    idx_map[valid_idx] = i
+                    idx_map[valid_idx] = aligned_idx
                     valid_idx += 1
-            
-            for anom_idx, anom_type in zip(indices, types):
-                actual_idx = idx_map.get(anom_idx)
-                if actual_idx is None:
-                    continue
-                
-                value = aligned_values[actual_idx]
-                
-                # Пересчитываем индекс для downsampled данных
-                if need_downsample:
-                    ds_idx = int(actual_idx / bucket_size)
-                    if ds_idx >= max_points:
-                        ds_idx = max_points - 1
-                else:
-                    ds_idx = actual_idx
-                
-                key = f"{tag_name}|{anom_type}"
-                
-                if key not in anomalies_by_type:
-                    anomalies_by_type[key] = {
-                        "tag": tag_name,
-                        "type": anom_type,
-                        "points": []
-                    }
-                anomalies_by_type[key]["points"].append((ds_idx, value))
-        
-        # Создаём dataset для каждого типа аномалий
-        for key, info in anomalies_by_type.items():
-            atype = info["type"]
-            tag_name = info["tag"]
-            color_info = type_colors.get(atype, type_colors["noise"])
-            
-            type_data = [None] * len(ds_timestamps)
-            for idx, val in info["points"]:
-                if 0 <= idx < len(type_data):
-                    type_data[idx] = val
-            
-            label = f"{color_info['label']} ({tag_name})"
-            
-            # Дрейф рисуем ЛИНИЕЙ (пунктир), остальные — точками
-            if atype == "drift":
-                datasets.append({
-                    "label": label,
-                    "data": type_data,
-                    "borderColor": color_info["color"],
-                    "backgroundColor": color_info["color"],
-                    "type": "line",
-                    "borderWidth": 2,
-                    "borderDash": [6, 3],
-                    "pointRadius": 2,
-                    "pointHoverRadius": 4,
-                    "showLine": True,
-                    "spanGaps": True,
-                })
+
+            # Преобразуем индексы
+            converted_indices = []
+            converted_timestamps = []
+            converted_values = []
+            converted_types = []
+
+            for anom_idx, anom_ts, anom_val, anom_type in zip(
+                tag_anomalies_raw.get('anomaly_indices', []),
+                tag_anomalies_raw.get('anomaly_timestamps', []),
+                tag_anomalies_raw.get('anomaly_values', []),
+                tag_anomalies_raw.get('anomaly_types', [])
+            ):
+                # Преобразуем индекс из valid_values в aligned_values
+                aligned_idx = idx_map.get(anom_idx)
+                if aligned_idx is not None and aligned_idx < len(aligned_values):
+                    converted_indices.append(aligned_idx)
+                    converted_timestamps.append(anom_ts)
+                    converted_values.append(aligned_values[aligned_idx])
+                    converted_types.append(anom_type)
+
+            if converted_indices:
+                tag_anomalies = {
+                    'anomaly_indices': converted_indices,
+                    'anomaly_timestamps': converted_timestamps,
+                    'anomaly_values': converted_values,
+                    'anomaly_types': converted_types,
+                    'total_anomalies': len(converted_indices),
+                }
+
+        # Вызываем РАБОЧИЙ single-tag механизм
+        tag_spec = create_time_series_spec(
+            timestamps=common_timestamps,
+            values=aligned_values,
+            tag_name=tag_name,
+            anomalies=tag_anomalies,
+            max_points=max_points,
+        )
+
+        # Берём labels из первого тега
+        if first_labels is None:
+            first_labels = tag_spec['data']['labels']
+
+        # Обрабатываем datasets
+        for j, dataset in enumerate(tag_spec['data']['datasets']):
+            if j == 0:
+                # Первый dataset — основная линия тега: меняем цвет
+                dataset['borderColor'] = tag_line_colors[i % len(tag_line_colors)]
+                dataset['backgroundColor'] = tag_line_colors[i % len(tag_line_colors)]
+                all_datasets.append(dataset)
             else:
-                datasets.append({
-                    "label": label,
-                    "data": type_data,
-                    "borderColor": color_info["color"],
-                    "backgroundColor": color_info["color"],
-                    "type": "scatter",
-                    "pointRadius": 5,
-                    "pointHoverRadius": 7,
-                    "showLine": False,
-                })
-    
-    spec = {
+                # Остальные — аномалии: используем общие цвета
+                label = dataset.get('label', '')
+                for atype, color_info in anomaly_colors.items():
+                    if atype in label.lower() or color_info['label'] in label:
+                        dataset['borderColor'] = color_info['color']
+                        dataset['backgroundColor'] = color_info['color']
+                        # Убираем имя тега из label аномалии чтобы не дублировать
+                        if f"({tag_name})" in label:
+                            dataset['label'] = color_info['label']
+                        break
+                all_datasets.append(dataset)
+
+    if first_labels is None:
+        first_labels = []
+
+    return {
         "type": "line",
         "data": {
-            "labels": labels,
-            "datasets": datasets,
+            "labels": first_labels,
+            "datasets": all_datasets,
         },
         "options": {
             "responsive": True,
@@ -604,24 +569,11 @@ def create_multitag_time_series_spec(
                     "mode": "index",
                     "intersect": False,
                 },
-                "zoom": {
-                    "pan": {"enabled": True, "mode": "x"},
-                    "zoom": {
-                        "wheel": {"enabled": True, "speed": 0.05},
-                        "pinch": {"enabled": True},
-                        "drag": {
-                            "enabled": True,
-                            "modifierKey": "shift",
-                            "backgroundColor": "rgba(59, 130, 246, 0.1)",
-                        },
-                        "mode": "x",
-                    },
-                },
             },
             "scales": {
                 "x": {
+                    "type": "category",
                     "display": True,
-                    "grid": {"display": False},
                     "ticks": {"maxTicksLimit": 10, "font": {"size": 9}},
                 },
                 "y": {
@@ -630,12 +582,6 @@ def create_multitag_time_series_spec(
                     "ticks": {"font": {"size": 9}},
                 },
             },
-            "interaction": {
-                "mode": "nearest",
-                "axis": "x",
-                "intersect": False,
-            },
         },
     }
-    
-    return spec
+

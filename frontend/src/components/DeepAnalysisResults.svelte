@@ -14,6 +14,7 @@
   }
 
   import { Line } from 'svelte-chartjs'
+  import ChartModal from './ChartModal.svelte'
   import {
     Chart as ChartJS,
     CategoryScale,
@@ -27,7 +28,7 @@
     BubbleController,
   } from 'chart.js'
   import zoomPlugin from 'chartjs-plugin-zoom'
-  import { Activity, AlertTriangle, ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, ChevronDown, Circle, Download, Grid3x3, Info, Lightbulb, Loader2, RotateCcw, Table, TrendingUp, Waves, Zap, ZoomIn, ZoomOut } from 'lucide-svelte'
+  import { Activity, AlertTriangle, ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, ChevronDown, Circle, Download, Grid3x3, Info, Lightbulb, Loader2, RotateCcw, Table, TrendingUp, Waves, Zap, ZoomIn, ZoomOut, Maximize2} from 'lucide-svelte'
   import api from '../lib/api'
 
   ChartJS.register(
@@ -61,6 +62,25 @@
   let scatterChartInstance: ChartJS | null = $state(null)
   const tsChartId = `dda-ts-${Math.random().toString(36).slice(2, 9)}`
   const scatterChartId = `dda-scatter-${Math.random().toString(36).slice(2, 9)}`
+  // ChartModal state
+  let modalOpen = $state(false)
+  let modalChartType = $state<'line' | 'bar'>('line')
+  let modalTitle = $state('')
+  let modalData = $state<any>(null)
+  let modalOptions = $state<any>(null)
+
+  function openChartModal(type: 'line' | 'bar', title: string, data: any, options: any) {
+    modalChartType = type
+    modalTitle = title
+    modalData = data
+    modalOptions = options
+    modalOpen = true
+  }
+
+  function closeChartModal() {
+    modalOpen = false
+  }
+
 
   // Данные графиков
   let timeSeriesData = $derived(
@@ -186,7 +206,7 @@
       },
     },
     scales: {
-      x: { display: true, grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+      x: { type: 'category' as const, display: true, grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
       y: { display: true, grid: { color: 'rgba(0, 0, 0, 0.05)' }, ticks: { font: { size: 10 } } }
     },
     interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false }
@@ -493,6 +513,7 @@
               <button type="button" onclick={zoomOutTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
               <button type="button" onclick={resetZoomTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
               <button type="button" onclick={() => downloadPNG(tsChartInstance, 'timeseries')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+              <button type="button" onclick={() => openChartModal('line', `Временной ряд: ${analysisResult?.tags?.[0] || 'Tag'}`, timeSeriesData, timeSeriesOptions)} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Полноэкранный режим"><Maximize2 size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
             </div>
           </div>
           <div id={tsChartId} class="h-[300px] bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700 p-3">
@@ -519,6 +540,7 @@
               <button type="button" onclick={zoomOutTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
               <button type="button" onclick={resetZoomTs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
               <button type="button" onclick={() => downloadPNG(tsChartInstance, 'multitag_timeseries')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+              <button type="button" onclick={() => openChartModal('line', 'Временные ряды (мульти-тег)', timeSeriesData, timeSeriesOptions)} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Полноэкранный режим"><Maximize2 size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
             </div>
           </div>
           <div class="text-xs text-neutral-500 dark:text-neutral-400 mb-2 flex items-center gap-1.5">
@@ -1025,3 +1047,12 @@
     </div>
   {/if}
 </div>
+
+<ChartModal
+  isOpen={modalOpen}
+  title={modalTitle}
+  chartType={modalChartType}
+  chartData={modalData}
+  chartOptions={modalOptions}
+  onClose={closeChartModal}
+/>
