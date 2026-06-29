@@ -10,6 +10,7 @@ from modules.deep_analysis.collectors.data_fetcher import fetch_tag_data, fetch_
 from modules.deep_analysis.collectors.tag_resolver import get_available_tags
 from modules.deep_analysis.analyzers.stats import compute_basic_stats, compute_histogram
 from modules.deep_analysis.analyzers.anomalies import detect_anomalies_isolation_forest
+from modules.deep_analysis.analyzers.seasonal import detect_dominant_periods, decompose_seasonal, get_seasonal_pattern
 from modules.deep_analysis.analyzers.correlations import compute_correlation_matrix, compute_pair_correlation
 from modules.deep_analysis.visualizers.chart_specs import create_time_series_spec, create_histogram_spec, create_heatmap_spec, create_scatter_spec, create_multitag_time_series_spec
 from modules.deep_analysis.history.storage import save_analysis, load_analysis, list_analyses, generate_analysis_id
@@ -162,10 +163,38 @@ async def run_analysis(request: AnalysisRequest):
             histogram_spec = create_histogram_spec(histogram, tag_name)
             
             # Формируем результат
+
+            # Сезонный анализ для single-tag
+            seasonal_analysis = {}
+            if len(data['raw_values']) >= 50:
+                try:
+                    periods_result = detect_dominant_periods(
+                        data['raw_values'],
+                        data['raw_timestamps']
+                    )
+                    
+                    decomp_result = None
+                    pattern_result = None
+                    
+                    if periods_result.get('detected_periods'):
+                        main_period = periods_result['detected_periods'][0]['period']
+                        decomp_result = decompose_seasonal(data['raw_values'], period=main_period)
+                        pattern_result = get_seasonal_pattern(data['raw_values'], period=main_period)
+                    
+                    seasonal_analysis = {
+                        "periods": periods_result,
+                        "decomposition": decomp_result,
+                        "pattern": pattern_result,
+                    }
+                except Exception as e:
+                    log.warning("Seasonal analysis failed", tag=tag_name, error=str(e))
+                    seasonal_analysis = {"error": str(e)}
+
             results = {
                 "statistics": stats,
                 "histogram": histogram,
                 "anomalies": anomalies_result,
+                "seasonal_analysis": seasonal_analysis,
             }
             
             # Краткое summary
@@ -340,7 +369,7 @@ async def run_analysis(request: AnalysisRequest):
                 statistics=stats,
                 anomalies=anomalies_result,
                 correlations=None,
-                seasonality=None,
+                seasonality=seasonal_analysis,
                 visualizations={
                     "time_series": time_series_spec,
                     "histogram": histogram_spec,
@@ -359,7 +388,7 @@ async def run_analysis(request: AnalysisRequest):
                 statistics=None,
                 anomalies=combined_anomalies,  # НОВОЕ: аномалии для мульти-тег
                 correlations=correlation_matrix,
-                seasonality=None,
+                seasonality=seasonal_analysis,
                 visualizations={
                     "heatmap": heatmap_spec,
                     "scatter": scatter_spec,
