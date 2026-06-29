@@ -298,10 +298,41 @@ async def run_analysis(request: AnalysisRequest):
                 anomalies_per_tag
             )
             
+            # Сезонный анализ для каждого тега
+            seasonal_analysis = {}
+            for tag_name in request.tags:
+                tag_data = data['tags'].get(tag_name, {})
+                aligned_values = tag_data.get('aligned_values', [])
+                
+                if len(aligned_values) >= 50:
+                    try:
+                        periods_result = detect_dominant_periods(
+                            aligned_values,
+                            data['common_timestamps']
+                        )
+                        
+                        decomp_result = None
+                        pattern_result = None
+                        
+                        if periods_result.get('detected_periods'):
+                            main_period = periods_result['detected_periods'][0]['period']
+                            decomp_result = decompose_seasonal(aligned_values, period=main_period)
+                            pattern_result = get_seasonal_pattern(aligned_values, period=main_period)
+                        
+                        seasonal_analysis[tag_name] = {
+                            "periods": periods_result,
+                            "decomposition": decomp_result,
+                            "pattern": pattern_result,
+                        }
+                    except Exception as e:
+                        log.warning("Seasonal analysis failed", tag=tag_name, error=str(e))
+                        seasonal_analysis[tag_name] = {"error": str(e)}
+
             # Формируем результаты
             results = {
                 "correlation_matrix": correlation_matrix,
                 "pair_analysis": pair_analysis,
+                "seasonal_analysis": seasonal_analysis,
             }
             
             # Summary

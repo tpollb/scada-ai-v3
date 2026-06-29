@@ -524,10 +524,213 @@
             {/if}
           </div>
         </div>
+        <!-- Сезонный анализ -->
+        {#if analysisResult?.seasonality?.periods?.detected_periods?.length > 0}
+        <div class="mb-4">
+          <h3 class="text-sm font-semibold mb-2 flex items-center gap-2">
+            <Waves size={16} class="text-purple-500" />
+            Сезонность
+          </h3>
+          
+          {#if analysisResult.seasonality.periods.detected_periods.length > 0}
+          <div class="mb-3">
+            <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Обнаруженные периоды:</div>
+            <div class="grid grid-cols-2 gap-2">
+              {#each analysisResult.seasonality.periods.detected_periods.slice(0, 4) as period}
+                <div class="p-2 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-800">
+                  <div class="text-xs text-neutral-600 dark:text-neutral-400">Период</div>
+                  <div class="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                    {period.period} точек
+                    {#if period.period >= 280 && period.period <= 300}
+                      <span class="text-xs text-neutral-500">(~24ч)</span>
+                    {:else if period.period >= 2000 && period.period <= 2100}
+                      <span class="text-xs text-neutral-500">(~7 дней)</span>
+                    {/if}
+                  </div>
+                  <div class="text-xs text-neutral-500 mt-1">
+                    Уверенность: {(period.confidence * 100).toFixed(0)}%
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+          {/if}
+
+          {#if analysisResult.seasonality.decomposition?.variance_explained}
+          {@const ve = analysisResult.seasonality.decomposition.variance_explained}
+          <div class="mb-3">
+            <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Распределение дисперсии:</div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <div class="w-20 text-xs text-neutral-600 dark:text-neutral-400">Тренд:</div>
+                <div class="flex-1 bg-neutral-200 dark:bg-neutral-700 rounded-full h-4 overflow-hidden">
+                  <div class="bg-blue-500 h-full" style="width: {ve.trend}%"></div>
+                </div>
+                <div class="w-12 text-xs text-right font-mono">{ve.trend.toFixed(1)}%</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-20 text-xs text-neutral-600 dark:text-neutral-400">Сезонность:</div>
+                <div class="flex-1 bg-neutral-200 dark:bg-neutral-700 rounded-full h-4 overflow-hidden">
+                  <div class="bg-purple-500 h-full" style="width: {ve.seasonal}%"></div>
+                </div>
+                <div class="w-12 text-xs text-right font-mono">{ve.seasonal.toFixed(1)}%</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-20 text-xs text-neutral-600 dark:text-neutral-400">Остаток:</div>
+                <div class="flex-1 bg-neutral-200 dark:bg-neutral-700 rounded-full h-4 overflow-hidden">
+                  <div class="bg-neutral-500 h-full" style="width: {ve.residual}%"></div>
+                </div>
+                <div class="w-12 text-xs text-right font-mono">{ve.residual.toFixed(1)}%</div>
+              </div>
+            </div>
+          </div>
+                    {/if}
+
+          {#if analysisResult.seasonality.pattern?.pattern?.length > 0}
+          {@const pattern = analysisResult.seasonality.pattern.pattern}
+          {@const minVal = Math.min(...pattern.filter(v => v !== null))}
+          {@const maxVal = Math.max(...pattern.filter(v => v !== null))}
+          {@const range = maxVal - minVal}
+          <div class="mb-3">
+            <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">
+              Типичный суточный паттерн (период {analysisResult.seasonality.periods.detected_periods[0].period} точек):
+            </div>
+            <div class="p-2 bg-neutral-50 dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700">
+              <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                Мин: {minVal.toFixed(1)} | Макс: {maxVal.toFixed(1)} | Размах: {range.toFixed(1)}
+              </div>
+              <div class="flex items-end gap-0.5 h-16">
+                {#each pattern.slice(0, 48) as val, i}
+                  {#if val !== null}
+                    <div 
+                      class="flex-1 bg-gradient-to-t from-purple-500 to-purple-400 rounded-t transition-all hover:from-purple-600 hover:to-purple-500"
+                      style="height: {((val - minVal) / range) * 100}%"
+                      title="Фаза {i}: {val.toFixed(1)}"
+                    ></div>
+                  {/if}
+                {/each}
+              </div>
+              <div class="flex justify-between text-xs text-neutral-500 mt-1">
+                <span>00:00</span>
+                <span>12:00</span>
+                <span>24:00</span>
+              </div>
+            </div>
+          </div>
+                                                  {/if}
+        </div>
+        {/if}
+
       {/if}
 
       <!-- ==================== MULTI-TAG: CORRELATIONS ==================== -->
       {#if isMultiTag && activeTab === 'correlations'}
+
+        <!-- Сезонный анализ (multi-tag) -->
+        {#if analysisResult?.seasonality && Object.keys(analysisResult.seasonality).length > 0}
+        <div class="mb-4">
+          <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Waves size={16} class="text-purple-500" />
+            Сезонный анализ ({Object.keys(analysisResult.seasonality).length} тегов)
+          </h3>
+          
+          {#each Object.entries(analysisResult.seasonality) as [tagName, tagSeasonality]}
+            {#if tagSeasonality?.periods?.detected_periods?.length > 0}
+            <div class="mb-4 p-3 bg-neutral-50 dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700">
+              <h4 class="text-sm font-medium mb-2 text-neutral-700 dark:text-neutral-300">{tagName}</h4>
+              
+              {#if tagSeasonality.periods.detected_periods.length > 0}
+              <div class="mb-3">
+                <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Обнаруженные периоды:</div>
+                <div class="grid grid-cols-2 gap-2">
+                  {#each tagSeasonality.periods.detected_periods.slice(0, 4) as period}
+                    <div class="p-2 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-800">
+                      <div class="text-xs text-neutral-600 dark:text-neutral-400">Период</div>
+                      <div class="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                        {period.period} точек
+                        {#if period.period >= 280 && period.period <= 300}
+                          <span class="text-xs text-neutral-500">(~24ч)</span>
+                        {:else if period.period >= 2000 && period.period <= 2100}
+                          <span class="text-xs text-neutral-500">(~7 дней)</span>
+                        {/if}
+                      </div>
+                      <div class="text-xs text-neutral-500 mt-1">
+                        Уверенность: {(period.confidence * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+              {/if}
+
+              {#if tagSeasonality.decomposition?.variance_explained}
+              {@const ve = tagSeasonality.decomposition.variance_explained}
+              <div class="mb-3">
+                <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Распределение дисперсии:</div>
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2">
+                    <div class="w-20 text-xs text-neutral-600 dark:text-neutral-400">Тренд:</div>
+                    <div class="flex-1 bg-neutral-200 dark:bg-neutral-700 rounded-full h-4 overflow-hidden">
+                      <div class="bg-blue-500 h-full" style="width: {ve.trend}%"></div>
+                    </div>
+                    <div class="w-12 text-xs text-right font-mono">{ve.trend.toFixed(1)}%</div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="w-20 text-xs text-neutral-600 dark:text-neutral-400">Сезонность:</div>
+                    <div class="flex-1 bg-neutral-200 dark:bg-neutral-700 rounded-full h-4 overflow-hidden">
+                      <div class="bg-purple-500 h-full" style="width: {ve.seasonal}%"></div>
+                    </div>
+                    <div class="w-12 text-xs text-right font-mono">{ve.seasonal.toFixed(1)}%</div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="w-20 text-xs text-neutral-600 dark:text-neutral-400">Остаток:</div>
+                    <div class="flex-1 bg-neutral-200 dark:bg-neutral-700 rounded-full h-4 overflow-hidden">
+                      <div class="bg-neutral-500 h-full" style="width: {ve.residual}%"></div>
+                    </div>
+                    <div class="w-12 text-xs text-right font-mono">{ve.residual.toFixed(1)}%</div>
+                  </div>
+                </div>
+              </div>
+                            {/if}
+
+              {#if tagSeasonality.pattern?.pattern?.length > 0}
+              {@const pattern = tagSeasonality.pattern.pattern}
+              {@const minVal = Math.min(...pattern.filter(v => v !== null))}
+              {@const maxVal = Math.max(...pattern.filter(v => v !== null))}
+              {@const range = maxVal - minVal}
+              <div class="mb-3">
+                <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">
+                  Типичный суточный паттерн:
+                </div>
+                <div class="p-2 bg-white dark:bg-neutral-900 rounded border border-neutral-200 dark:border-neutral-700">
+                  <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                    Мин: {minVal.toFixed(1)} | Макс: {maxVal.toFixed(1)} | Размах: {range.toFixed(1)}
+                  </div>
+                  <div class="flex items-end gap-0.5 h-16">
+                    {#each pattern.slice(0, 48) as val, i}
+                      {#if val !== null}
+                        <div 
+                          class="flex-1 bg-gradient-to-t from-purple-500 to-purple-400 rounded-t transition-all hover:from-purple-600 hover:to-purple-500"
+                          style="height: {((val - minVal) / range) * 100}%"
+                          title="Фаза {i}: {val.toFixed(1)}"
+                        ></div>
+                      {/if}
+                    {/each}
+                  </div>
+                  <div class="flex justify-between text-xs text-neutral-500 mt-1">
+                    <span>00:00</span>
+                    <span>12:00</span>
+                    <span>24:00</span>
+                  </div>
+                </div>
+              </div>
+                                                                      {/if}
+            </div>
+            {/if}
+          {/each}
+        </div>
+        {/if}
+
         <!-- 0. Time series с аномалиями (если есть) -->
         {#if analysisResult?.visualizations?.time_series?.data?.datasets?.length > 0}
         <div class="mb-4">

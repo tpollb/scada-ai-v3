@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     # App
     app_name: str = "SCADA.AI v3"
-    app_version: str = "3.2.3"
+    app_version: str = "3.2.7"
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = True

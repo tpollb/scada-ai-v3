@@ -1340,7 +1340,7 @@ changelog_content = """# Changelog
 - [ ] Конфигуратор тегов счётчиков (energy_config.json)
 - [ ] Виджет `energy_cost_card` — суммарная стоимость ресурсов
 
-### v3.2.0 (Планируется)
+### v3.2.7 (Планируется)
 - [ ] Модуль `historical_data` — тренды и сравнение периодов
 - [ ] Модуль `predictive_analytics` — прогнозы экономии
 - [ ] Boss dashboard — отдельный экран для руководства
