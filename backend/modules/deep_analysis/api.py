@@ -15,6 +15,7 @@ from modules.deep_analysis.analyzers.seasonal import detect_dominant_periods, de
 from modules.deep_analysis.analyzers.correlations import compute_correlation_matrix, compute_pair_correlation
 from modules.deep_analysis.visualizers.chart_specs import create_time_series_spec, create_histogram_spec, create_heatmap_spec, create_scatter_spec, create_multitag_time_series_spec
 from modules.deep_analysis.history.storage import save_analysis, load_analysis, list_analyses, generate_analysis_id
+from fastapi.responses import StreamingResponse
 
 log = get_logger()
 router = APIRouter(prefix="/deep_analysis", tags=["deep_analysis"])
@@ -1137,3 +1138,175 @@ async def ab_analysis(request: Request):
                 "traceback": traceback.format_exc().split('\n')[-5:]
             }
         )
+
+
+# ============================================================================
+# LLM INTERPRETATION ENDPOINTS
+# ============================================================================
+
+@router.post("/interpret", response_model=dict)
+async def interpret_analysis(request: Request):
+    """
+    Генерирует LLM-интерпретацию результатов глубокого анализа.
+    
+    Принимает результат анализа (полный или частичный) и возвращает
+    экспертную интерпретацию в markdown формате.
+    """
+    from modules.deep_analysis.llm.interpreter import get_dda_interpreter
+    import json
+    
+    try:
+        # Читаем сырое тело запроса
+        raw_body = await request.body()
+        
+        # Пробуем декодировать как UTF-8
+        try:
+            body_text = raw_body.decode('utf-8')
+        except UnicodeDecodeError:
+            # Fallback: пробуем Windows-1251 (частая проблема в Windows Git Bash)
+            try:
+                body_text = raw_body.decode('cp1251')
+                log.warning("Request body decoded as cp1251 (Windows encoding)")
+            except UnicodeDecodeError:
+                # Последний fallback: latin-1 (всегда работает)
+                body_text = raw_body.decode('latin-1')
+                log.warning("Request body decoded as latin-1")
+        
+        # Парсим JSON
+        try:
+            body = json.loads(body_text)
+        except json.JSONDecodeError as e:
+            log.error("Invalid JSON in request", error=str(e))
+            return {
+                "error": f"Invalid JSON: {e}",
+                "interpretation": "❌ Некорректный JSON в запросе"
+            }
+        
+        analysis_result = body.get('analysis_result', {})
+        
+        if not analysis_result:
+            return {
+                "error": "No analysis_result provided",
+                "interpretation": "❌ Не предоставлены данные для интерпретации"
+            }
+        
+        interpreter = get_dda_interpreter()
+        interpretation = await interpreter.interpret(analysis_result)
+        
+        return {
+            "interpretation": interpretation,
+            "success": True
+        }
+        
+    except Exception as e:
+        log.error("Interpret endpoint failed", error=str(e))
+        return {
+            "error": str(e),
+            "interpretation": f"❌ Ошибка интерпретации: {e}"
+        }
+
+
+@router.post("/interpret/stream")
+async def interpret_analysis_stream(request: Request):
+    """
+    Генерирует LLM-интерпретацию с SSE streaming.
+    
+    Возвращает интерпретацию по частям через Server-Sent Events.
+    Клиент получает текст постепенно по мере генерации LLM.
+    
+    SSE формат:
+    - data: {"chunk": "текст"} - для текстовых чанков
+    - data: {"done": true} - сигнал завершения
+    """
+    from modules.deep_analysis.llm.interpreter import get_dda_interpreter
+    import json
+    
+    try:
+        # Читаем сырое тело запроса
+        raw_body = await request.body()
+        
+        # Пробуем декодировать как UTF-8
+        try:
+            body_text = raw_body.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                body_text = raw_body.decode('cp1251')
+                log.warning("Stream request body decoded as cp1251")
+            except UnicodeDecodeError:
+                body_text = raw_body.decode('latin-1')
+                log.warning("Stream request body decoded as latin-1")
+        
+        # Парсим JSON
+        try:
+            body = json.loads(body_text)
+        except json.JSONDecodeError as e:
+            async def error_stream():
+                error_data = json.dumps({"error": f"Invalid JSON: {e}"})
+                yield f"data: {error_data}\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
+        
+        analysis_result = body.get('analysis_result', {})
+        
+        if not analysis_result:
+            async def error_stream():
+                error_data = json.dumps({"error": "No analysis_result provided"})
+                yield f"data: {error_data}\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
+        
+        interpreter = get_dda_interpreter()
+        
+        async def generate_stream():
+            try:
+                async for chunk in interpreter.interpret_stream(analysis_result):
+                    # Отправляем каждый чанк как SSE event
+                    chunk_data = json.dumps({"chunk": chunk})
+                    yield f"data: {chunk_data}\n\n"
+                # Сигнал завершения
+                done_data = json.dumps({"done": True})
+                yield f"data: {done_data}\n\n"
+            except Exception as e:
+                log.error("Stream generation failed", error=str(e))
+                error_data = json.dumps({"error": str(e)})
+                yield f"data: {error_data}\n\n"
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Для nginx
+            }
+        )
+        
+    except Exception as e:
+        log.error("Interpret stream endpoint failed", error=str(e))
+        
+        async def error_stream():
+            error_data = json.dumps({"error": str(e)})
+            yield f"data: {error_data}\n\n"
+        return StreamingResponse(error_stream(), media_type="text/event-stream")
+
+
+@router.get("/interpret/ping")
+async def interpret_ping():
+    """Проверка доступности LLM интерпретации"""
+    from modules.deep_analysis.llm.interpreter import get_dda_interpreter
+    
+    try:
+        interpreter = get_dda_interpreter()
+        provider = interpreter._get_provider()
+        
+        # Пробуем health check
+        health_ok = await provider.health_check()
+        
+        return {
+            "status": "ok" if health_ok else "degraded",
+            "llm_available": health_ok,
+            "provider": provider.provider_name if hasattr(provider, 'provider_name') else "unknown"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "llm_available": False,
+            "error": str(e)
+        }

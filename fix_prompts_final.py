@@ -1,44 +1,40 @@
-"""Промпты для LLM-интерпретации результатов глубокого анализа"""
-
-DDA_SYSTEM_PROMPT = """Ты — старший инженер-аналитик SCADA-системы промышленного здания.
-
-Твоя задача — на основе предоставленных результатов глубокого анализа данных (статистика, аномалии, сезонность, корреляции, A/B сравнение) дать экспертную интерпретацию.
-
-ПРИНЦИПЫ:
-- Говори конкретно и по делу. Без воды.
-- Каждое утверждение должно быть основано на цифрах из входных данных.
-- Рекомендации должны быть выполнимыми инженером/техником.
-- Указывай ожидаемый эффект и приоритет.
-- Если есть корреляция между параметрами — упомяни это как возможную причину.
-- Объясняй физические/инженерные причины наблюдаемых паттернов.
-
-ФОРМАТ ОТВЕТА:
-Используй markdown для структурирования:
-
-# 📊 Резюме
-[1-2 предложения о текущем состоянии системы]
-
-## 🔍 Ключевые находки
-[3-5 пунктов с конкретными цифрами и интерпретацией]
-
-## 💡 Возможные причины
-[2-4 пункта с инженерными объяснениями]
-
-## ✅ Рекомендации
-[Конкретные действия с приоритетами и ожидаемым эффектом]
-
-## 📈 Прогноз
-[Что произойдёт если ничего не менять]
-
-ВАЖНО:
-- НЕ выдумывай данные, которых нет в input
-- Используй ТОЛЬКО предоставленные числа
-- Отвечай на русском языке
-- Будь краток, но информативен
+#!/usr/bin/env python3
 """
+fix_prompts_final.py - перезаписывает build_dda_prompt с safe форматированием
+"""
+from pathlib import Path
 
+prompts_path = Path('backend/modules/deep_analysis/prompts.py')
+content = prompts_path.read_text(encoding='utf-8')
 
-def _safe_format(value, fmt: str = ".2f", default: str = "N/A") -> str:
+print('Перезаписываю функцию build_dda_prompt...')
+print()
+
+# Находим начало и конец функции build_dda_prompt
+lines = content.split('\n')
+
+# Ищем def build_dda_prompt
+start_idx = None
+for i, line in enumerate(lines):
+    if line.startswith('def build_dda_prompt('):
+        start_idx = i
+        break
+
+if start_idx is None:
+    print('❌ Функция build_dda_prompt не найдена')
+    exit(1)
+
+# Ищем конец функции (следующая функция или конец файла)
+end_idx = len(lines)
+for i in range(start_idx + 1, len(lines)):
+    if lines[i].startswith('def ') or lines[i].startswith('class '):
+        end_idx = i
+        break
+
+print(f'Найдена функция на строках {start_idx+1}-{end_idx}')
+
+# Новая функция с safe форматированием
+new_function = '''def _safe_format(value, fmt: str = ".2f", default: str = "N/A") -> str:
     """Безопасное форматирование чисел с fallback на 'N/A'"""
     if value is None:
         return default
@@ -224,4 +220,24 @@ def build_dda_prompt(analysis_result: dict) -> str:
     lines.append("Дай конкретные рекомендации инженеру.")
     lines.append("Используй markdown для структурирования ответа.")
 
-    return "\n".join(lines)
+    return "\\n".join(lines)
+'''
+
+# Удаляем старую функцию и вставляем новую
+new_lines = lines[:start_idx] + new_function.split('\n') + lines[end_idx:]
+new_content = '\n'.join(new_lines)
+
+# Сохраняем
+prompts_path.write_text(new_content, encoding='utf-8', newline='\n')
+
+print()
+print('✅ Функция build_dda_prompt перезаписана')
+print()
+
+# Проверяем синтаксис
+import ast
+try:
+    ast.parse(new_content)
+    print('✅ Файл синтаксически корректен')
+except SyntaxError as e:
+    print(f'❌ Синтаксическая ошибка: {e}')
