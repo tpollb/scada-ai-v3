@@ -141,9 +141,61 @@ async def get_modules():
 
 @router.put("/modules/{module_name}/prompts/{prompt_name}")
 async def update_prompt(module_name: str, prompt_name: str, req: UpdatePromptRequest):
-    """Обновляет промпт модуля"""
-    log.info("Prompt update requested", module=module_name, prompt=prompt_name)
-    return {"status": "ok", "message": "Промпт будет использован в следующих запросах"}
+    """
+    Обновляет промпт модуля.
+    
+    Сохраняет изменённый промпт в prompts_override.yaml внутри папки модуля.
+    При загрузке модуля override имеет приоритет над prompts.py.
+    """
+    import yaml
+    from pathlib import Path as PathLib
+    
+    log.info("Prompt update requested", module=module_name, prompt=prompt_name, chars=len(req.prompt_text))
+    
+    # Путь к override файлу модуля
+    module_path = PathLib(__file__).parent.parent.parent / "modules" / module_name
+    override_path = module_path / "prompts_override.yaml"
+    
+    if not module_path.exists():
+        raise HTTPException(status_code=404, detail=f"Модуль {module_name} не найден")
+    
+    # Читаем существующий override или создаём новый
+    overrides = {}
+    if override_path.exists():
+        try:
+            with open(override_path, "r", encoding="utf-8") as f:
+                overrides = yaml.safe_load(f) or {}
+        except Exception as e:
+            log.warning("Failed to read existing override", error=str(e))
+    
+    # Обновляем промпт
+    overrides[prompt_name] = req.prompt_text
+    
+    # Сохраняем
+    try:
+        with open(override_path, "w", encoding="utf-8") as f:
+            yaml.dump(overrides, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        
+        log.info("Prompt saved to override", module=module_name, prompt=prompt_name, path=str(override_path))
+        
+        # Перезагружаем модуль чтобы изменения применились
+        try:
+            from core.module_registry import get_registry
+            registry = get_registry()
+            if module_name in registry._modules and registry._modules[module_name].is_loaded:
+                registry.reload_module(module_name)
+                log.info("Module reloaded to apply prompt changes", module=module_name)
+        except Exception as reload_error:
+            log.warning("Module reload failed (will apply on next restart)", error=str(reload_error))
+        
+        return {
+            "status": "ok", 
+            "message": f"Промпт '{prompt_name}' сохранён и применён",
+            "saved_to": str(override_path)
+        }
+    except Exception as e:
+        log.error("Failed to save prompt", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Ошибка сохранения: {e}")
 
 
 @router.post("/modules/{module_name}/reload")

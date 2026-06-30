@@ -33,6 +33,19 @@ class Module:
             for name in dir(prompts_module)
             if not name.startswith("_") and isinstance(getattr(prompts_module, name), str)
         }
+        
+        # Override prompts from prompts_override.yaml (если есть)
+        override_path = self.path / "prompts_override.yaml"
+        if override_path.exists():
+            try:
+                with open(override_path, "r", encoding="utf-8") as f:
+                    overrides = yaml.safe_load(f) or {}
+                for name, text in overrides.items():
+                    if isinstance(text, str) and name in self.prompts:
+                        self.prompts[name] = text
+                        log.debug(f"Prompt overridden: {self.name}/{name}")
+            except Exception as e:
+                log.warning(f"Failed to load prompts override for {self.name}", error=str(e))
 
         # Load tools
         try:
@@ -106,6 +119,22 @@ class ModuleRegistry:
         for module in self._modules.values():
             tools.extend(module.tools)
         return tools
+
+
+    def reload_module(self, name: str) -> bool:
+        """Перезагружает модуль (перечитывает prompts и tools)"""
+        if name not in self._modules:
+            return False
+        
+        module = self._modules[name]
+        module._loaded = False
+        module.prompts = {}
+        module.tools = []
+        
+        # Перезагружаем
+        module.load()
+        log.info(f"Module reloaded: {name}", prompts=len(module.prompts))
+        return True
 
     def get_all_prompts(self) -> Dict[str, str]:
         """Get all prompts from all loaded modules"""
