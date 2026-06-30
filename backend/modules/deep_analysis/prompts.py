@@ -2,226 +2,238 @@
 
 DDA_SYSTEM_PROMPT = """Ты — старший инженер-аналитик SCADA-системы промышленного здания.
 
-Твоя задача — на основе предоставленных результатов глубокого анализа данных (статистика, аномалии, сезонность, корреляции, A/B сравнение) дать экспертную интерпретацию.
+Твоя задача — дать ДЕТАЛЬНУЮ техническую интерпретацию на основе предоставленных данных.
 
-ПРИНЦИПЫ:
-- Говори конкретно и по делу. Без воды.
-- Каждое утверждение должно быть основано на цифрах из входных данных.
-- Рекомендации должны быть выполнимыми инженером/техником.
-- Указывай ожидаемый эффект и приоритет.
-- Если есть корреляция между параметрами — упомяни это как возможную причину.
-- Объясняй физические/инженерные причины наблюдаемых паттернов.
+СТРОГИЕ ЗАПРЕТЫ:
+- ЗАПРЕЩЕНО использовать любые эмодзи
+- ЗАПРЕЩЕНО использовать символ решётки (#)
+- ЗАПРЕЩЕНО использовать markdown заголовки
+- ЗАПРЕЩЕНЫ общие фразы без конкретики ("проблемы с датчиками", "возможные проблемы")
 
-ФОРМАТ ОТВЕТА:
-Используй markdown для структурирования:
+ТРЕБОВАНИЯ К КОНКРЕТИКЕ:
+- В КАЖДОМ утверждении используй КОНКРЕТНЫЕ ЦИФРЫ из входных данных
+- Указывай ТОЧНЫЕ НАЗВАНИЯ ТЕГОВ (например "KITCHEN2-CO2", а не "зона 1")
+- Указывай ТОЧНЫЕ ПЕРИОДЫ (например "288 точек = 24 часа", а не "сутки")
+- Указывай ТОЧНЫЕ ЗНАЧЕНИЯ (r = 0.62, p-value = 0.001, 1469 аномалий)
+- Приводи ВЫЧИСЛЕННЫЕ МЕТРИКИ (процент от нормы, отклонение в единицах измерения)
+- Для каждого тега указывай ЕДИНИЦЫ ИЗМЕРЕНИЯ (ppm, °C, %, кВт·ч)
 
-# 📊 Резюме
-[1-2 предложения о текущем состоянии системы]
+ФОРМАТ ОТВЕТА (СТРОГО СЛЕДУЙ):
 
-## 🔍 Ключевые находки
-[3-5 пунктов с конкретными цифрами и интерпретацией]
+РЕЗЮМЕ
+[2-3 предложения с упоминанием конкретных тегов и ключевых метрик. Пример: "В тегах KITCHEN2-CO2 (среднее 850 ppm) и R201-CO2 (среднее 920 ppm) обнаружено 1469 аномалий за период 30 дней."]
 
-## 💡 Возможные причины
-[2-4 пункта с инженерными объяснениями]
+КЛЮЧЕВЫЕ НАХОДКИ
+- [Конкретный факт с цифрами. Пример: "Тег KITCHEN2-CO2: 529 аномалий типа spike (отклонения >3σ от среднего 850 ppm),主要集中在 рабочие часы 8:00-18:00."]
+- [Конкретный факт. Пример: "Корреляция KITCHEN2-CO2 ↔ R201-CO2: r = 0.62 (p < 0.001), что указывает на общий источник выбросов."]
+- [Конкретный факт. Пример: "Сезонность KITCHEN2-CO2: доминирующий период 288 точек (24 часа) с мощностью 0.73 и уверенностью 82%."]
 
-## ✅ Рекомендации
-[Конкретные действия с приоритетами и ожидаемым эффектом]
+ВОЗМОЖНЫЕ ПРИЧИНЫ
+- [Техническая причина с объяснением механизма. Пример: "Синхронные пики CO2 в обеих зонах в 12:00-14:00 (обеденное время) указывают на работу кухонного оборудования или вентиляционной системы."]
+- [Причина. Пример: "Отсутствие суточной цикличности в R201-CO2 (мощность сезонности 0.12) может указывать на неисправность датчика или постоянный источник выбросов."]
 
-## 📈 Прогноз
-[Что произойдёт если ничего не менять]
+РЕКОМЕНДАЦИИ
+- Приоритет: высокий. [Конкретное действие с указанием оборудования]. Ожидаемый эффект: [измеримый результат в цифрах].
+- Приоритет: средний. [Действие]. Ожидаемый эффект: [результат].
+- Приоритет: низкий. [Действие]. Ожидаемый эффект: [результат].
+
+ПРОГНОЗ
+[Что произойдёт через 7/30 дней если ничего не менять, с оценкой в цифрах]
 
 ВАЖНО:
-- НЕ выдумывай данные, которых нет в input
-- Используй ТОЛЬКО предоставленные числа
+- НЕ выдумывай данные которых нет в input
+- Используй ТОЛЬКО предоставленные числа и теги
 - Отвечай на русском языке
-- Будь краток, но информативен
+- Каждый пункт должен содержать МИНИМУМ 2 конкретные цифры
+- ПИШИ ПРОСТОЙ ТЕКСТ БЕЗ СПЕЦСИМВОЛОВ
 """
 
 
-def _safe_format(value, fmt: str = ".2f", default: str = "N/A") -> str:
-    """Безопасное форматирование чисел с fallback на 'N/A'"""
-    if value is None:
-        return default
+def _safe_format(value, fmt=".2f", default="N/A"):
+    if value is None: return default
     try:
-        num = float(value)
-        return f"{num:{fmt}}"
+        return f"{float(value):{fmt}}"
     except (ValueError, TypeError):
-        return str(value) if value else default
-
-
-def _safe_pct(value, default: str = "N/A") -> str:
-    """Безопасное форматирование процентов"""
-    if value is None:
-        return default
-    try:
-        num = float(value)
-        # Если число уже в процентах (больше 1.5), форматируем как есть
-        if abs(num) > 1.5:
-            return f"{num:.1f}%"
-        else:
-            return f"{num:.1%}"
-    except (ValueError, TypeError):
-        return str(value) if value else default
+        return str(value) if value is not None else default
 
 
 def build_dda_prompt(analysis_result: dict) -> str:
-    """
-    Строит user prompt с результатами глубокого анализа.
+    """Компактный промпт для LLM — только ключевые метрики, без сырых массивов"""
     
-    Args:
-        analysis_result: полный результат анализа из /deep_analysis/run
-        
-    Returns:
-        Строка с отформатированными данными для LLM
-    """
     lines = [
         "Проанализируй результаты глубокого анализа данных SCADA-системы.",
         "",
         "=== ОСНОВНАЯ ИНФОРМАЦИЯ ===",
         f"Период анализа: {analysis_result.get('period', 'N/A')}",
-        f"Количество тегов: {len(analysis_result.get('tags', []))}",
-        "",
+        f"Теги: {', '.join(analysis_result.get('tags', []))}",
     ]
-
-    # Статистика
-    if 'statistics' in analysis_result:
-        lines.append("=== СТАТИСТИКА ===")
-        for tag_name, stats in analysis_result['statistics'].items():
-            lines.append(f"• {tag_name}:")
-            lines.append(f"    Среднее: {_safe_format(stats.get('mean'))}")
-            lines.append(f"    Медиана: {_safe_format(stats.get('median'))}")
-            lines.append(f"    Std: {_safe_format(stats.get('std'))}")
-            lines.append(f"    Мин-Макс: {_safe_format(stats.get('min'))} - {_safe_format(stats.get('max'))}")
-            lines.append(f"    Диапазон: {_safe_format(stats.get('range'))}")
-            lines.append("")
-
-    # Аномалии
-    if 'anomalies' in analysis_result:
-        lines.append("=== АНОМАЛИИ ===")
-        for tag_name, anomaly_data in analysis_result['anomalies'].items():
-            total = anomaly_data.get('total_anomalies', 0)
-            anomaly_type = anomaly_data.get('anomaly_type', 'N/A')
-            lines.append(f"• {tag_name}: {total} аномалий (тип: {anomaly_type})")
-            if 'anomaly_indices' in anomaly_data:
-                indices = anomaly_data['anomaly_indices'][:5]
-                lines.append(f"    Индексы: {indices}...")
-            if 'anomaly_values' in anomaly_data:
-                values = anomaly_data['anomaly_values'][:5]
-                lines.append(f"    Значения: {values}...")
+    
+    # Summary (если есть — это самое важное!)
+    summary = analysis_result.get('summary')
+    if summary:
         lines.append("")
-
-    # Сезонность
-    if 'seasonality' in analysis_result:
+        lines.append(f"Краткое резюме: {summary}")
+    
+    # === СТАТИСТИКА (может быть None для multi-tag) ===
+    stats = analysis_result.get('statistics')
+    if stats and isinstance(stats, dict):
+        lines.append("")
+        lines.append("=== СТАТИСТИКА ===")
+        for tag_name, tag_stats in stats.items():
+            if isinstance(tag_stats, dict):
+                mean = tag_stats.get('mean')
+                std = tag_stats.get('std')
+                mn = tag_stats.get('min')
+                mx = tag_stats.get('max')
+                lines.append(f"• {tag_name}: mean={_safe_format(mean)}, std={_safe_format(std)}, range=[{_safe_format(mn)}..{_safe_format(mx)}]")
+    
+    # === АНОМАЛИИ (только количество, не индексы!) ===
+    anomalies = analysis_result.get('anomalies')
+    if anomalies and isinstance(anomalies, dict):
+        lines.append("")
+        lines.append("=== АНОМАЛИИ ===")
+        
+        # Проверяем структуру: может быть per_tag или сразу по тегам
+        per_tag = anomalies.get('per_tag', anomalies)
+        
+        if isinstance(per_tag, dict):
+            for tag_name, anom_data in per_tag.items():
+                if isinstance(anom_data, dict):
+                    count = len(anom_data.get('anomaly_indices', []))
+                    anom_type = anom_data.get('anomaly_type', 'unknown')
+                    lines.append(f"• {tag_name}: {count} аномалий (тип: {anom_type})")
+                elif isinstance(anom_data, int):
+                    lines.append(f"• {tag_name}: {anom_data} аномалий")
+        
+        # Общая статистика
+        total = anomalies.get('total_anomalies')
+        if total:
+            lines.append(f"Всего аномалий: {total}")
+    
+    # === СЕЗОННОСТЬ (только доминирующие периоды) ===
+    seasonality = analysis_result.get('seasonality')
+    if seasonality and isinstance(seasonality, dict):
+        lines.append("")
         lines.append("=== СЕЗОННОСТЬ ===")
-        for tag_name, season_data in analysis_result['seasonality'].items():
+        for tag_name, season_data in seasonality.items():
+            if not isinstance(season_data, dict):
+                continue
+            
             lines.append(f"• {tag_name}:")
-            
-            # Периоды
             periods = season_data.get('periods', {})
-            if periods:
-                dominant = periods.get('dominant_period', {})
-                if dominant:
-                    lines.append(f"    Доминирующий период: {dominant.get('period', 'N/A')} точек")
-                    lines.append(f"    Уверенность: {_safe_pct(dominant.get('confidence'))}")
-                    lines.append(f"    Мощность: {_safe_format(dominant.get('power'))}")
+            
+            if isinstance(periods, dict):
+                detected = periods.get('detected_periods', [])
+                if isinstance(detected, list) and detected:
+                    # Берём топ-3 периода
+                    top_periods = detected[:3]
+                    for p in top_periods:
+                        if isinstance(p, dict):
+                            period = p.get('period', 'N/A')
+                            power = p.get('power', 0)
+                            conf = p.get('confidence', 0)
+                            # Форматируем период в дни/часы
+                            hours = period / 12 if isinstance(period, (int, float)) else 0
+                            days = hours / 24
+                            if days >= 1:
+                                period_str = f"~{days:.1f} дней"
+                            elif hours >= 1:
+                                period_str = f"~{hours:.1f}ч"
+                            else:
+                                period_str = f"{period} точек"
+                            lines.append(f"    Период: {period_str} (power={_safe_format(power)}, conf={_safe_format(conf, '.1%')})")
                 
-                # Декомпозиция
-                decomp = periods.get('decomposition', {})
-                if decomp:
-                    lines.append(f"    Декомпозиция:")
-                    lines.append(f"      Тренд: {_safe_pct(decomp.get('trend'))}")
-                    lines.append(f"      Сезонность: {_safe_pct(decomp.get('seasonal'))}")
-                    lines.append(f"      Остаток: {_safe_pct(decomp.get('residual'))}")
+                dominant = periods.get('dominant_period', {})
+                if isinstance(dominant, dict) and dominant:
+                    period = dominant.get('period')
+                    conf = dominant.get('confidence', 0)
+                    lines.append(f"    Доминирующий: период={period}, уверенность={_safe_format(conf, '.1%')}")
             
-            # Паттерн
-            pattern = season_data.get('pattern', {})
-            if pattern:
-                lines.append(f"    Типичный паттерн:")
-                lines.append(f"      Период: {pattern.get('period', 'N/A')} точек")
-                lines.append(f"      Мин: {_safe_format(pattern.get('min'))}")
-                lines.append(f"      Макс: {_safe_format(pattern.get('max'))}")
-                lines.append(f"      Амплитуда: {_safe_format(pattern.get('amplitude'))}")
-            lines.append("")
-
-    # Корреляции
-    if 'correlations' in analysis_result:
+            # Паттерн (только статистика)
+            pattern = season_data.get('pattern')
+            if isinstance(pattern, dict):
+                amplitude = pattern.get('amplitude')
+                if amplitude is not None:
+                    lines.append(f"    Амплитуда: {_safe_format(amplitude)}")
+    
+    # === КОРРЕЛЯЦИИ (только сильные пары) ===
+    correlations = analysis_result.get('correlations')
+    if correlations and isinstance(correlations, dict):
+        lines.append("")
         lines.append("=== КОРРЕЛЯЦИИ ===")
-        corr_data = analysis_result['correlations']
-        if 'matrix' in corr_data:
-            matrix = corr_data['matrix']
-            tags = corr_data.get('tags', [])
-            
-            # Показываем сильные корреляции
-            strong_corr = []
+        
+        tags = correlations.get('tags', [])
+        matrix = correlations.get('matrix', [])
+        method = correlations.get('method', 'pearson')
+        valid_points = correlations.get('valid_points', 'N/A')
+        
+        lines.append(f"Метод: {method}, валидных точек: {valid_points}")
+        
+        if isinstance(tags, list) and isinstance(matrix, list):
+            # Извлекаем сильные корреляции (|r| > 0.5)
+            strong_pairs = []
             for i in range(len(tags)):
                 for j in range(i+1, len(tags)):
-                    coef = matrix[i][j]
-                    try:
-                        if abs(float(coef)) > 0.5:
-                            strong_corr.append((tags[i], tags[j], coef))
-                    except (ValueError, TypeError):
-                        pass
+                    if i < len(matrix) and j < len(matrix[i]):
+                        coef = matrix[i][j]
+                        try:
+                            coef_val = float(coef)
+                            if abs(coef_val) > 0.5:
+                                strong_pairs.append((tags[i], tags[j], coef_val))
+                        except (ValueError, TypeError):
+                            pass
             
-            if strong_corr:
-                strong_corr.sort(key=lambda x: abs(float(x[2])), reverse=True)
-                for tag1, tag2, coef in strong_corr[:5]:
-                    lines.append(f"• {tag1} ↔ {tag2}: r={_safe_format(coef, '+.3f')}")
+            if strong_pairs:
+                strong_pairs.sort(key=lambda x: abs(x[2]), reverse=True)
+                lines.append("Сильные корреляции (|r| > 0.5):")
+                for tag1, tag2, coef in strong_pairs[:5]:
+                    lines.append(f"  • {tag1} ↔ {tag2}: r={coef:+.3f}")
             else:
-                lines.append("• Сильных корреляций не обнаружено (|r| < 0.5)")
+                lines.append("Сильных корреляций не обнаружено (все |r| < 0.5)")
+    
+    # === A/B СРАВНЕНИЕ (если есть) ===
+    ab = analysis_result.get('ab_comparison')
+    if ab and isinstance(ab, dict):
         lines.append("")
-
-    # A/B анализ (если есть)
-    if 'ab_comparison' in analysis_result:
         lines.append("=== A/B СРАВНЕНИЕ ===")
-        ab = analysis_result['ab_comparison']
         
         lines.append(f"Режим: {ab.get('mode', 'N/A')}")
-        lines.append(f"Период A: {ab.get('snapshot_a', {}).get('period', 'N/A')}")
-        lines.append(f"Период B: {ab.get('snapshot_b', {}).get('period', 'N/A')}")
-        lines.append("")
         
-        # Статистика
         stats = ab.get('statistics', {})
-        delta = stats.get('delta', {})
-        if delta:
-            lines.append("Изменения:")
-            lines.append(f"  Среднее: {_safe_pct(delta.get('mean'))}")
-            lines.append(f"  Std: {_safe_pct(delta.get('std'))}")
-            lines.append(f"  Мин: {_safe_pct(delta.get('min'))}")
-            lines.append(f"  Макс: {_safe_pct(delta.get('max'))}")
-            lines.append("")
+        if isinstance(stats, dict):
+            delta = stats.get('delta', {})
+            if isinstance(delta, dict):
+                lines.append(f"Изменение среднего: {_safe_format(delta.get('mean'), '+.2%')}")
         
-        # Значимость
         sig = ab.get('significance', {})
-        if sig:
-            lines.append("Статистическая значимость:")
-            lines.append(f"  t-stat: {_safe_format(sig.get('t_stat'), '.3f')}")
-            lines.append(f"  p-value: {_safe_format(sig.get('p_value'), '.6f')}")
-            lines.append(f"  Интерпретация: {sig.get('interpretation', 'N/A')}")
-            lines.append("")
+        if isinstance(sig, dict):
+            pval = sig.get('p_value')
+            interp = sig.get('interpretation', '')
+            if pval is not None:
+                lines.append(f"p-value: {pval} ({interp})")
         
-        # Паттерны
-        patterns = ab.get('pattern_comparison', {})
-        if patterns:
-            lines.append("Сравнение паттернов:")
-            lines.append(f"  Периоды совпадают: {patterns.get('period_match', 'N/A')}")
-            lines.append(f"  Изменение амплитуды: {_safe_pct(patterns.get('delta_amplitude_pct', 0) / 100)}")
-            if patterns.get('pattern_correlation') is not None:
-                lines.append(f"  Корреляция паттернов: {_safe_format(patterns['pattern_correlation'], '.3f')}")
-            lines.append("")
-        
-        # Вердикт
         verdict = ab.get('verdict', {})
-        if verdict:
-            lines.append(f"Автоматический вердикт: {verdict.get('severity', 'N/A')}")
-            if verdict.get('summary'):
-                lines.append(f"  {verdict['summary']}")
-            lines.append("")
-
+        if isinstance(verdict, dict):
+            severity = verdict.get('severity')
+            summary_ab = verdict.get('summary')
+            if severity:
+                lines.append(f"Вердикт: {severity}")
+            if summary_ab:
+                lines.append(f"  {summary_ab}")
+    
+    lines.append("")
     lines.append("=== ТВОЯ ЗАДАЧА ===")
     lines.append("Дай экспертную интерпретацию этих данных.")
     lines.append("Объясни что происходит в системе и почему.")
     lines.append("Дай конкретные рекомендации инженеру.")
     lines.append("Используй markdown для структурирования ответа.")
 
-    return "\n".join(lines)
+    result = "\n".join(lines)
+    
+    # Логируем размер
+    from structlog import get_logger
+    log = get_logger()
+    log.info("DDA prompt built", chars=len(result), 
+             estimated_tokens=len(result) // 4)
+    
+    return result

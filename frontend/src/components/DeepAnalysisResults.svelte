@@ -29,8 +29,9 @@
     Filler,
   } from 'chart.js'
   import zoomPlugin from 'chartjs-plugin-zoom'
-  import { Activity, AlertTriangle, ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, ChevronDown, Circle, Download, Grid3x3, Info, Lightbulb, Loader2, RotateCcw, Table, TrendingUp, Waves, Zap, ZoomIn, ZoomOut, Maximize2} from 'lucide-svelte'
+  import { Activity, AlertTriangle, ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, ChevronDown, Circle, Download, Grid3x3, Info, Lightbulb, Loader2, RotateCcw, Table, TrendingUp, Waves, Zap, ZoomIn, ZoomOut, Maximize2, Brain} from 'lucide-svelte'
   import api from '../lib/api'
+  import DDAInterpretation from './DDAInterpretation.svelte'
 
   ChartJS.register(
     CategoryScale, LinearScale, PointElement, LineElement,
@@ -99,7 +100,16 @@ let isMultiTag = $derived(
   )
 
   let expandedType = $state<string | null>(null)
-  let activeTab = $state<'overview' | 'correlations' | 'table'>('overview')
+  let activeTab = $state<'overview' | 'correlations' | 'table' | 'interpretation'>('overview')
+  let visitedTabs = $state(new Set<string>(['overview']))
+
+  // Keep alive: запоминаем открытые вкладки чтобы не терять состояние
+  $effect(() => {
+    if (activeTab) {
+      visitedTabs.add(activeTab)
+    }
+  })
+
   $effect(() => {
     if (isMultiTag) activeTab = 'correlations'
     else activeTab = 'overview'
@@ -519,6 +529,16 @@ let isMultiTag = $derived(
             Обзор
           </div>
         </button>
+        <button
+          type="button"
+          onclick={() => activeTab = 'interpretation'}
+          class="px-4 py-2 text-sm font-medium border-b-2 transition {activeTab === 'interpretation' ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
+        >
+          <div class="flex items-center gap-1.5">
+            <Brain size={14} />
+            Интерпретация
+          </div>
+        </button>
       {/if}
       {#if isMultiTag}
         <button
@@ -539,6 +559,16 @@ let isMultiTag = $derived(
           <div class="flex items-center gap-1.5">
             <Table size={14} />
             Таблица пар
+          </div>
+        </button>
+        <button
+          type="button"
+          onclick={() => activeTab = 'interpretation'}
+          class="px-4 py-2 text-sm font-medium border-b-2 transition {activeTab === 'interpretation' ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
+        >
+          <div class="flex items-center gap-1.5">
+            <Brain size={14} />
+            Интерпретация
           </div>
         </button>
       {/if}
@@ -1341,6 +1371,11 @@ let isMultiTag = $derived(
         </div>
       {/if}
     </div>
+      {#if visitedTabs.has('interpretation')}
+        <div class:hidden={activeTab !== 'interpretation'}>
+          <DDAInterpretation {analysisResult} />
+        </div>
+      {/if}
   {:else}
     <div class="flex-1 flex items-center justify-center">
       <div class="flex flex-col items-center text-center text-neutral-400 dark:text-neutral-500">

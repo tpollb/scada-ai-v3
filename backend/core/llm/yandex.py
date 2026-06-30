@@ -340,6 +340,7 @@ class YandexLLMProvider(LLMProvider):
             resp.raise_for_status()
             
             buffer = ""
+            prev_text = ""  # Для вычисления дельты (YandexGPT возвращает кумулятивный текст)
             async for raw_line in resp.aiter_lines():
                 line = raw_line.strip()
                 if not line:
@@ -366,7 +367,12 @@ class YandexLLMProvider(LLMProvider):
                     msg = alternatives[0].get("message", {})
                     text = msg.get("text", "")
                     if text:
-                        yield text
+                        # YandexGPT возвращает КУМУЛЯТИВНЫЙ текст в каждом чанке
+                        # Вычисляем дельту — только новую часть
+                        delta = text[len(prev_text):]
+                        prev_text = text
+                        if delta:
+                            yield delta
 
     async def health_check(self) -> bool:
         try:
