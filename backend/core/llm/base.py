@@ -62,6 +62,27 @@ class LLMProvider(ABC):
         ...
 
     @abstractmethod
+    async def generate_stream(
+        self,
+        system: str,
+        user: str,
+        *,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ):
+        """
+        Streaming генерация текста.
+        Yield-ит текстовые чанки по мере поступления от LLM.
+        
+        Usage:
+            async for chunk in provider.generate_stream(sys, usr):
+                print(chunk, end='', flush=True)
+        """
+        ...
+        if False:
+            yield ""
+
+    @abstractmethod
     async def health_check(self) -> bool:
         """Проверка доступности провайдера"""
         ...

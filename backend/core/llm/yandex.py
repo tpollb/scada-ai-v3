@@ -298,6 +298,76 @@ class YandexLLMProvider(LLMProvider):
             "iterations": iterations,
         }
 
+    async def generate_stream(
+        self,
+        system: str,
+        user: str,
+        *,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ):
+        """
+        Streaming генерация текста через YandexGPT.
+        
+        Yield-ит текстовые чанки по мере поступления от модели.
+        Использует httpx stream() для SSE (Server-Sent Events).
+        """
+        messages = self._build_messages(system, user)
+        input_chars = sum(len(m["text"]) for m in messages)
+        actual_max = self._compute_max_tokens(input_chars, max_tokens or self.max_tokens)
+        temp = temperature if temperature is not None else self.temperature
+
+        payload = {
+            "modelUri": self.model_uri,
+            "completionOptions": {
+                "stream": True,
+                "temperature": temp,
+                "maxTokens": actual_max,
+            },
+            "messages": messages,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Api-Key {self.api_key}",
+        }
+
+        log.debug("YandexGPT streaming request", messages_count=len(messages))
+
+        async with self._client.stream(
+            "POST", self.API_URL, headers=headers, json=payload, timeout=self.timeout
+        ) as resp:
+            resp.raise_for_status()
+            
+            buffer = ""
+            async for raw_line in resp.aiter_lines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                
+                # SSE формат: "data: {...}"
+                if line.startswith("data:"):
+                    line = line[5:].strip()
+                
+                if not line:
+                    continue
+                
+                # Накопление буфера для неполных JSON
+                buffer += line
+                try:
+                    chunk_data = json.loads(buffer)
+                    buffer = ""
+                except json.JSONDecodeError:
+                    continue
+                
+                # Извлекаем текст из альтернативы
+                alternatives = chunk_data.get("result", {}).get("alternatives", [])
+                if alternatives:
+                    msg = alternatives[0].get("message", {})
+                    text = msg.get("text", "")
+                    if text:
+                        yield text
+
     async def health_check(self) -> bool:
         try:
             await self.generate("Ты тест.", "Скажи ок", max_tokens=10)

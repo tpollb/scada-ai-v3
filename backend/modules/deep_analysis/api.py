@@ -1,5 +1,6 @@
 """Deep Analysis API endpoints"""
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from datetime import datetime, timedelta
@@ -1045,3 +1046,94 @@ async def diagnose_downsampling(tag_name: str, period: int = 30, max_points: int
         log.error("Downsampling diagnosis failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@router.post("/ab")
+async def ab_analysis(request: Request):
+    """
+    A/B анализ: сравнение двух временных периодов или двух тегов.
+    
+    Modes:
+    - before_after: один тег в разные периоды (snapshot_a.tag == snapshot_b.tag)
+    - equipment_comparison: два тега в один период (snapshot_a.tag != snapshot_b.tag)
+    """
+    from modules.deep_analysis.analyzers.ab import (
+        compare_snapshots,
+        compare_patterns,
+        generate_verdict
+    )
+    
+    try:
+        body = await request.json()
+        
+        snapshot_a = body.get('snapshot_a', {})
+        snapshot_b = body.get('snapshot_b', {})
+    
+        tag_a = snapshot_a.get('tag')
+        tag_b = snapshot_b.get('tag')
+        start_a = datetime.fromisoformat(snapshot_a.get('start'))
+        end_a = datetime.fromisoformat(snapshot_a.get('end'))
+        start_b = datetime.fromisoformat(snapshot_b.get('start'))
+        end_b = datetime.fromisoformat(snapshot_b.get('end'))
+    
+        log.info(
+        "A/B analysis request",
+        tag_a=tag_a,
+        tag_b=tag_b,
+        period_a=f"{start_a} - {end_a}",
+        period_b=f"{start_b} - {end_b}"
+        )
+    
+        # Определяем режим
+        mode = "before_after" if tag_a == tag_b else "equipment_comparison"
+    
+        # Получаем данные
+        data_a = await fetch_multiple_tags([tag_a], start_a, end_a)
+        data_b = await fetch_multiple_tags([tag_b], start_b, end_b)
+    
+        values_a = data_a['tags'][tag_a]['values']
+        values_b = data_b['tags'][tag_b]['values']
+    
+        # Базовое сравнение
+        comparison = compare_snapshots(values_a, values_b)
+    
+        # Сравнение паттернов (опционально, если достаточно данных)
+        pattern_comparison = None
+        if len(values_a) >= 288 and len(values_b) >= 288:  # минимум 24 часа данных
+            pattern_comparison = compare_patterns(values_a, values_b)
+    
+        # Генерируем вердикт
+        verdict = generate_verdict(comparison, pattern_comparison, mode)
+    
+        # Формируем ответ
+        result = {
+        "mode": mode,
+        "snapshot_a": {
+            "tag": tag_a,
+            "period": f"{start_a.isoformat()} - {end_a.isoformat()}",
+            "data_points": len(values_a)
+        },
+        "snapshot_b": {
+            "tag": tag_b,
+            "period": f"{start_b.isoformat()} - {end_b.isoformat()}",
+            "data_points": len(values_b)
+        },
+        "comparison": comparison,
+        "verdict": verdict
+        }
+    
+        if pattern_comparison:
+            result["pattern_comparison"] = pattern_comparison
+    
+        return result
+
+    except Exception as e:
+        log.error("A/B analysis failed", error=str(e), traceback=traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e),
+                "detail": "A/B analysis failed",
+                "traceback": traceback.format_exc().split('\n')[-5:]
+            }
+        )
