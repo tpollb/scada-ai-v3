@@ -15,59 +15,120 @@ from .seasonal import detect_dominant_periods, get_seasonal_pattern
 
 log = get_logger()
 
+def _safe_float(v, default=0.0):
+    if v is None:
+        return default
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return default
+    if v != v or abs(v) > 1e10:
+        return default
+    return v
+
+
+def _safe_pct_change(val_a, val_b):
+    if val_a is None or val_b is None:
+        return 0.0
+    if abs(val_a) < 1e-10:
+        return 0.0 if abs(val_b) < 1e-10 else (9999.0 if val_b > 0 else -9999.0)
+    delta = ((val_b - val_a) / abs(val_a)) * 100
+    if delta != delta or abs(delta) > 1e6:
+        return 0.0
+    return float(delta)
+
+
+MIN_SAMPLE_SIZE = 10
+
+
 
 def compare_snapshots(data_a: list[float], data_b: list[float]) -> dict:
     """
     Сравнивает два набора данных (snapshot A vs snapshot B).
-
-    Args:
-        data_a: значения первого периода/тега
-        data_b: значения второго периода/тега
-
-    Returns:
-        {
-            "statistics": {
-                "a": {...},  # базовая статистика для A
-                "b": {...},  # базовая статистика для B
-                "delta": {...}  # разница в процентах
-            },
+    Полная защита от NaN, малых выборок, KeyError, ZeroDivisionError.
+    """
+    # Валидация размера выборки
+    if len(data_a) < MIN_SAMPLE_SIZE or len(data_b) < MIN_SAMPLE_SIZE:
+        return {
+            "statistics": {"a": {}, "b": {}, "delta": {}},
             "significance": {
-                "t_stat": float,
-                "p_value": float,
-                "cohens_d": float,
-                "interpretation": str
+                "t_stat": 0.0, "p_value": 1.0, "cohens_d": 0.0,
+                "interpretation": "insufficient_data",
+                "reason": f"Sample too small: {len(data_a)}/{len(data_b)} (min {MIN_SAMPLE_SIZE})"
             }
         }
-    """
-    # Базовая статистика
-    stats_a = compute_basic_stats(data_a)
-    stats_b = compute_basic_stats(data_b)
 
-    # Разница в процентах (с защитой от inf/nan)
+    # Фильтрация NaN/Inf из данных
+    def is_valid(x):
+        if x is None:
+            return False
+        try:
+            return x == x and abs(x) < 1e15
+        except (TypeError, ValueError):
+            return False
+    
+    clean_a = [x for x in data_a if is_valid(x)]
+    clean_b = [x for x in data_b if is_valid(x)]
+
+    if len(clean_a) < MIN_SAMPLE_SIZE or len(clean_b) < MIN_SAMPLE_SIZE:
+        return {
+            "statistics": {"a": {}, "b": {}, "delta": {}},
+            "significance": {
+                "t_stat": 0.0, "p_value": 1.0, "cohens_d": 0.0,
+                "interpretation": "insufficient_data",
+                "reason": f"Too many NaN: {len(clean_a)}/{len(clean_b)}"
+            }
+        }
+
+    # Базовая статистика с защитой
+    try:
+        stats_a = compute_basic_stats(clean_a) or {}
+        stats_b = compute_basic_stats(clean_b) or {}
+    except Exception as e:
+        log.error("compute_basic_stats failed", error=str(e))
+        stats_a, stats_b = {}, {}
+
+    if not isinstance(stats_a, dict):
+        stats_a = {}
+    if not isinstance(stats_b, dict):
+        stats_b = {}
+
+    # Разница в процентах через безопасный доступ
     delta = {}
     for key in ['mean', 'median', 'std', 'min', 'max', 'range']:
-        val_a = stats_a.get(key, 0)
-        val_b = stats_b.get(key, 0)
-        
-        if val_a != 0 and abs(val_a) > 1e-10:
-            delta_val = ((val_b - val_a) / abs(val_a)) * 100
-            # Защита от inf/nan
-            if delta_val != delta_val or abs(delta_val) > 1e6:  # isnan или очень большое
-                delta[key] = 9999.0 if delta_val > 0 else -9999.0
-            else:
-                delta[key] = float(delta_val)
-        else:
-            delta[key] = 0.0 if val_b == 0 else 9999.0
+        val_a = stats_a.get(key)
+        val_b = stats_b.get(key)
+        delta[key] = _safe_pct_change(val_a, val_b)
 
-    # Статистическая значимость (Welch's t-test)
-    t_stat, p_value = stats.ttest_ind(data_a, data_b, equal_var=False)
+    # t-test с try/except и проверкой variance
+    t_stat, p_value = 0.0, 1.0
+    try:
+        if len(clean_a) >= 2 and len(clean_b) >= 2:
+            var_a = stats_a.get('variance', 0)
+            var_b = stats_b.get('variance', 0)
+            if (var_a is not None and var_a > 0) or (var_b is not None and var_b > 0):
+                result = stats.ttest_ind(clean_a, clean_b, equal_var=False)
+                t_stat = float(result.statistic)
+                p_value = float(result.pvalue)
+    except Exception as e:
+        log.warning("ttest_ind failed", error=str(e))
 
-    # Effect size (Cohen's d)
-    mean_diff = stats_b['mean'] - stats_a['mean']
-    pooled_std = np.sqrt((stats_a['variance'] + stats_b['variance']) / 2)
-    cohens_d = mean_diff / pooled_std if pooled_std > 0 else 0
+    # Cohen's d — через безопасные .get()
+    mean_a = _safe_float(stats_a.get('mean'), 0.0)
+    mean_b = _safe_float(stats_b.get('mean'), 0.0)
+    var_a = _safe_float(stats_a.get('variance'), 0.0)
+    var_b = _safe_float(stats_b.get('variance'), 0.0)
 
-    # Интерпретация
+    mean_diff = mean_b - mean_a
+    pooled_var = (var_a + var_b) / 2
+    try:
+        pooled_std = float(np.sqrt(pooled_var)) if pooled_var > 0 else 0.0
+    except Exception:
+        pooled_std = 0.0
+    cohens_d = mean_diff / pooled_std if pooled_std > 1e-10 else 0.0
+
+    # Интерпретация значимости
+    p_value = _safe_float(p_value, 1.0)
     if p_value < 0.001:
         significance_interp = "highly_significant"
     elif p_value < 0.05:
@@ -75,25 +136,28 @@ def compare_snapshots(data_a: list[float], data_b: list[float]) -> dict:
     else:
         significance_interp = "not_significant"
 
-    # Защита от inf/nan в significance
-    def safe_float(v, default=0.0):
-        if v is None:
-            return default
-        v = float(v)
-        if v != v or abs(v) > 1e10:  # isnan или слишком большое
-            return default
-        return v
-    
+    # Санитизация stats
+    def sanitize_dict(d):
+        if not isinstance(d, dict):
+            return {}
+        result = {}
+        for k, v in d.items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                result[k] = _safe_float(v, 0.0)
+            else:
+                result[k] = v
+        return result
+
     return {
         "statistics": {
-            "a": stats_a,
-            "b": stats_b,
+            "a": sanitize_dict(stats_a),
+            "b": sanitize_dict(stats_b),
             "delta": delta
         },
         "significance": {
-            "t_stat": safe_float(t_stat),
-            "p_value": safe_float(p_value, 1.0),
-            "cohens_d": safe_float(cohens_d),
+            "t_stat": _safe_float(t_stat),
+            "p_value": p_value,
+            "cohens_d": _safe_float(cohens_d),
             "interpretation": significance_interp
         }
     }
@@ -162,13 +226,22 @@ def compare_patterns(
     else:
         amp_b = 0.0
 
-    # Разница амплитуд в процентах
-    delta_amp = ((amp_b - amp_a) / amp_a * 100) if amp_a > 0 else 0
+    # Разница амплитуд в процентах (с защитой от NaN)
+    delta_amp = _safe_pct_change(amp_a, amp_b) if amp_a > 0 else 0.0
 
     # Корреляция паттернов (если периоды совпадают)
     pattern_corr = None
-    if period_a == period_b and len(pattern_a) == len(pattern_b) and len(pattern_a) > 0:
-        pattern_corr = float(np.corrcoef(pattern_a, pattern_b)[0, 1])
+    if period_a == period_b and len(pattern_a) == len(pattern_b) and len(pattern_a) > 2:
+        try:
+            corr_matrix = np.corrcoef(pattern_a, pattern_b)
+            corr_val = corr_matrix[0, 1]
+            if corr_val is not None and corr_val == corr_val and abs(corr_val) <= 1.0:
+                pattern_corr = float(corr_val)
+            else:
+                pattern_corr = None
+        except Exception as e:
+            log.debug("pattern correlation failed", error=str(e))
+            pattern_corr = None
 
     return {
         "a": {
@@ -210,11 +283,12 @@ def generate_verdict(
             "severity": str  # "low" | "medium" | "high"
         }
     """
-    stats = comparison_result['statistics']
-    sig = comparison_result['significance']
+    stats = comparison_result.get('statistics', {})
+    sig = comparison_result.get('significance', {})
     
-    delta_mean = stats['delta']['mean']
-    delta_std = stats['delta']['std']
+    delta = stats.get('delta', {}) if isinstance(stats, dict) else {}
+    delta_mean = _safe_float(delta.get('mean'), 0.0)
+    delta_std = _safe_float(delta.get('std'), 0.0)
     
     findings = []
     recommendations = []
@@ -236,9 +310,10 @@ def generate_verdict(
         severity = "high" if abs(delta_std) > 100 else max(severity, "medium")
 
     # 3. Статистическая значимость
-    if sig['interpretation'] == "highly_significant":
+    sig_interp = sig.get('interpretation', '') if isinstance(sig, dict) else ''
+    if sig_interp == "highly_significant":
         findings.append("Различие статистически высоко значимо (p < 0.001)")
-    elif sig['interpretation'] == "significant":
+    elif sig_interp == "significant":
         findings.append("Различие статистически значимо (p < 0.05)")
     else:
         findings.append("Различие статистически не значимо")

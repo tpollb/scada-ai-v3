@@ -18,6 +18,8 @@ ALLOWED_FILES = [
     "CHANGELOG.md",
     "ANALYTICS.md",
     "DDA.md",
+    "SEASON_ANALISYS.md",
+    "AB_ANALYSIS.md",
 ]
 
 

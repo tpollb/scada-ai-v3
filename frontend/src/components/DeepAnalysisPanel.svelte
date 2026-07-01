@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { Line } from 'svelte-chartjs'
+  import { ArrowRightLeft, onMount } from 'svelte'
+  import { ArrowRightLeft, Line } from 'svelte-chartjs'
   import {
     Chart as ChartJS,
     CategoryScale,
@@ -11,7 +11,7 @@
     Tooltip,
     Legend,
   } from 'chart.js'
-  import { X, Play, AlertTriangle, TrendingUp, Activity } from 'lucide-svelte'
+  import { ArrowRightLeft, X, Play, AlertTriangle, TrendingUp, Activity } from 'lucide-svelte'
   import api from '../lib/api'
 
   ChartJS.register(
@@ -36,6 +36,8 @@
   let period = $state<number>(30)
   let isAnalyzing = $state(false)
   let analysisResult = $state<any>(null)
+  let abModalOpen = $state(false)
+  let abResult = $state<any>(null)
   let error = $state<string | null>(null)
 
   // Chart instance
@@ -195,7 +197,7 @@
   </div>
 
   <!-- Controls -->
-  <div class="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 flex-shrink-0 space-y-3">
+  <div class="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 flex-shrink-0 space-y-3 max-h-[400px] overflow-y-auto">
     <!-- Tag selector -->
     <div>
       <label class="block text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-1">
@@ -248,6 +250,17 @@
         <Play size={14} />
         Запустить анализ
       {/if}
+    </button>
+    
+    <!-- Кнопка A/B сравнения -->
+    <button
+      type="button"
+      onclick={() => abModalOpen = true}
+      disabled={!selectedTag}
+      class="w-full py-2.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 disabled:opacity-50 text-neutral-700 dark:text-neutral-300 rounded font-medium flex items-center justify-center gap-2 transition mt-2"
+    >
+      <ArrowRightLeft size={16} />
+      Сравнить периоды (A/B)
     </button>
   </div>
 
@@ -359,4 +372,19 @@
       </div>
     {/if}
   </div>
+  
+  <!-- A/B Comparison Modal -->
+  <ABComparisonModal
+    isOpen={abModalOpen}
+    availableTags={availableTags}
+    defaultTag={selectedTags[0]}
+    onClose={() => abModalOpen = false}
+    onResult={(result) => {
+      abResult = result
+      // Если есть анализ — добавляем ab_comparison и обновляем
+      if (analysisResult) {
+        analysisResult.ab_comparison = result
+      }
+    }}
+  />
 </div>

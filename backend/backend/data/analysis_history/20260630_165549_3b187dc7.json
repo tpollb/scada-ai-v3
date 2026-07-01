@@ -1,0 +1,124 @@
+{
+  "analysis_id": "20260630_165549_3b187dc7",
+  "created_at": "2026-06-30T16:55:49.282477",
+  "params": {
+    "tags": [
+      "AIR0-1-Online",
+      "AIR0-2-Online",
+      "AIR0-3-Online"
+    ],
+    "period": "30 days",
+    "start_date": "2026-05-31T16:55:48.916863",
+    "end_date": "2026-06-30T16:55:48.916863",
+    "options": {
+      "anomalies": true,
+      "correlations": false,
+      "seasonality": false,
+      "compare_periods": false
+    }
+  },
+  "results": {
+    "correlation_matrix": {
+      "tags": [
+        "AIR0-1-Online",
+        "AIR0-2-Online",
+        "AIR0-3-Online"
+      ],
+      "matrix": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "p_values": [
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "method": "pearson"
+    },
+    "pair_analysis": {
+      "tag_x": "AIR0-1-Online",
+      "tag_y": "AIR0-2-Online",
+      "pearson": {
+        "coefficient": 0.0,
+        "p_value": 1.0,
+        "interpretation": "недостаточно данных"
+      },
+      "spearman": {
+        "coefficient": 0.0,
+        "p_value": 1.0,
+        "interpretation": "недостаточно данных"
+      },
+      "mutual_info": {
+        "mi": 0.0,
+        "normalized": 0.0,
+        "interpretation": "недостаточно данных"
+      },
+      "cross_correlation": {
+        "max_correlation": 0.0,
+        "optimal_lag": 0,
+        "interpretation": "недостаточно данных"
+      },
+      "scatter_data": {
+        "x": [],
+        "y": []
+      }
+    },
+    "seasonal_analysis": {
+      "AIR0-1-Online": {
+        "periods": {
+          "detected_periods": [],
+          "fft_peaks": [],
+          "autocorr_peaks": [],
+          "sampling_rate": 12.0,
+          "n_points": 8641
+        },
+        "decomposition": null,
+        "pattern": null
+      },
+      "AIR0-2-Online": {
+        "periods": {
+          "detected_periods": [],
+          "error": "insufficient_valid_data"
+        },
+        "decomposition": null,
+        "pattern": null
+      },
+      "AIR0-3-Online": {
+        "periods": {
+          "detected_periods": [],
+          "fft_peaks": [],
+          "autocorr_peaks": [],
+          "sampling_rate": 12.0,
+          "n_points": 8641
+        },
+        "decomposition": null,
+        "pattern": null
+      }
+    }
+  }
+}

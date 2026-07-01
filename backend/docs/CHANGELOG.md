@@ -1,5 +1,81 @@
 # Changelog
 
+## v3.2.9 (2026-07-01)
+
+**Added**
+
+**A/B Анализ** — полноценный статистический модуль сравнения периодов/оборудования
+
+Backend: `POST /api/v1/deep_analysis/ab` endpoint
+Backend: модуль `modules/deep_analysis/analyzers/ab.py` с функциями:
+`compare_snapshots()` — базовая статистика + Welch's t-test + Cohen's d
+`compare_patterns()` — FFT-автодетект периодов + корреляция суточных паттернов
+`generate_verdict()` — автоматический вердикт с severity (low/medium/high)
+Два режима анализа:
+**Before/After**: один тег, разные периоды (оценка эффекта изменений)
+**Equipment Comparison**: два тега, один период (сравнение оборудования)
+Метрики: mean/median/std/variance/min/max/range delta в %
+Статистическая значимость: p-value, t-stat, Cohen's d, интерпретация
+Сравнение паттернов: корреляция, совпадение периодов, изменение амплитуды
+Автогенерация findings и recommendations на основе результатов
+Frontend: `ABComparisonModal.svelte` — модалка с выбором режима/тегов/периодов
+Frontend: кнопка "Сравнить периоды (A/B)" в `DeepAnalysisControls`
+Frontend: визуализация результатов (verdict, статистика, значимость, паттерны)
+Frontend: кнопка "Использовать в анализе" — передача результата в LLM интерпретацию
+Frontend: автопереключение на вкладку "Интерпретация" через `forceTab` пропс
+Backend: защита от NaN/Inf/None через `_safe_float()` helper
+Backend: `_safe_pct_change()` — безопасный расчёт % изменений
+Backend: санитизация JSON ответа (рекурсивная замена NaN → null)
+Backend: валидация размера выборки (MIN_SAMPLE_SIZE = 10)
+Backend: фильтрация невалидных данных перед статистикой
+Backend: корректная обработка дат `YYYY-MM-DD` (расширение до 00:00:00 / 23:59:59)
+Документация: полная MD-документация по A/B анализу с математикой, API, примерами
+
+**Fixed**
+
+Frontend: **унификация высоты хидеров** SystemLogsPanel / DeepAnalysisControls / DeepAnalysisResults
+Убран встроенный margin у `<h2>` через `my-0`
+Добавлен `leading-6` (line-height: 24px) для консистентности между тегами
+Унифицирован размер шрифта: `text-base` (16px) во всех трёх хидерах
+Унифицирован padding: `px-4 py-3` (24px) для всех трёх контейнеров
+Восстановлен `border-b border-neutral-200 dark:border-neutral-700` у DeepAnalysisControls
+Упрощена структура вкладок: убран лишний `<div>` внутри `<button>`, flex перенесён на кнопку
+Убрано подчёркивание у активной вкладки — только цветовое выделение
+Сброшены дефолтные стили браузера для `<button>` (border/padding/background)
+Кнопки с иконками 16px: `p-1.5` → `p-1` (высота 24px = высоте h2)
+Добавлены accessibility атрибуты: `role="button"`, `tabindex="0"`, `onkeydown`
+Backend: `KeyError: 'mean'` в `compare_snapshots` при малых выборках
+Backend: `ValueError: Out of range float values are not JSON compliant: nan`
+Backend: `SmallSampleWarning` от scipy.stats.ttest_ind — добавлена проверка размера
+Backend: деление на ноль при `variance = 0` (константные данные) — защита в Cohen's d
+Backend: `np.corrcoef` возвращал NaN для константных паттернов — try/except + валидация
+Backend: некорректная парсинг дат формата `YYYY-MM-DD` без времени
+Backend: 500 ошибка при пустых данных — возврат 400 с понятным сообщением
+Frontend: **кнопки zoom (+/-/reset) не работали** на маленьком графике "Типичный паттерн"
+Добавлен `$effect` для заполнения `patternChartInstance` после рендеринга
+Аналогично time series графику: `ChartJS.getChart(canvas)` с задержкой 200ms
+Frontend: `NaN%` в отображении pattern_correlation — корректный путь `comparison.pattern_correlation`
+Frontend: миллионы процентов в статистике — `formatDelta()` с каппированием `>+999%` / `<-999%`
+Frontend: кнопка "Использовать в анализе" закрывала всю DDA-панель — теперь только модалку
+Frontend: раскрывающийся блок "Показать абсолютные значения" для статистики A и B
+
+**Changed**
+
+Frontend: вкладки в DeepAnalysisResults — современный стиль "пилюли" → минималистичный (только цвет)
+Frontend: `forceTab` пропс в `DeepAnalysisResults` для программного переключения вкладок
+Frontend: `handleABResult` в Home.svelte добавляет `ab_comparison` в `ddaAnalysisResult`
+Backend: endpoint `/ab` теперь возвращает структурированный 400 вместо 500 при валидационных ошибках
+
+**Technical**
+
+Helper функции `_safe_float()` и `_safe_pct_change()` в `ab.py` — защита от краевых случаев
+Константа `MIN_SAMPLE_SIZE = 10` — минимальный размер выборки для статистики
+`is_valid(x)` — фильтрация NaN/Inf/None из данных перед анализом
+`sanitize_dict()` — рекурсивная санитизация всех float значений в статистике
+try/except вокруг `compute_basic_stats`, `stats.ttest_ind`, `np.corrcoef`
+Проверка `variance > 0` перед запуском t-test (константные данные)
+Полная типизация: все функции возвращают предсказуемую структуру даже при ошибках
+
 ### v3.2.8 (2026-06-30)
 - [x] Multi-tag seasonal визуализация
 - [x] Chart.js с zoom/pan/tooltips для паттернов
@@ -35,6 +111,7 @@
 - [x] Визуализация временных рядов
 
 ## [3.2.0] - 2026-06-17
+
 ### Added
 - **Модуль analytics** — полноценный движок аналитики SCADA-системы
 - **Collectors**: сбор исторических данных (hourly/daily/raw) с адаптивным downsampling

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Play, Activity, X, Search, CheckSquare, Square } from 'lucide-svelte'
+  import { Play, Activity, X, Search, CheckSquare, Square, ArrowRightLeft } from 'lucide-svelte'
+  import ABComparisonModal from './ABComparisonModal.svelte'
 
   interface Props {
     tags: any[]
@@ -11,6 +12,7 @@
     onPeriodChange: (period: number) => void
     onRunAnalysis: () => void
     onClose: () => void
+    onABResult?: (result: any) => void
   }
 
   let { 
@@ -22,9 +24,11 @@
     onTagsChange, 
     onPeriodChange, 
     onRunAnalysis,
-    onClose
+    onClose,
+    onABResult
   }: Props = $props()
 
+  let abModalOpen = $state(false)
   let searchQuery = $state('')
 
   // Фильтруем теги по поиску
@@ -56,14 +60,14 @@
   <div class="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 flex-shrink-0">
     <div class="flex items-center gap-2">
       <Activity size={18} class="text-blue-500" />
-      <h2 class="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+      <h2 class="text-base font-semibold leading-6 text-neutral-900 dark:text-neutral-100 my-0">
         Deep Analysis
       </h2>
     </div>
     <button
       type="button"
       onclick={onClose}
-      class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+      class="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
       title="Закрыть"
     >
       <X size={16} class="text-neutral-500" />
@@ -178,10 +182,32 @@
       {/if}
     </button>
 
+    <!-- A/B сравнение -->
+    <button
+      type="button"
+      onclick={() => abModalOpen = true}
+      disabled={selectedTags.length === 0}
+      class="w-full mt-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 disabled:opacity-50 text-neutral-700 dark:text-neutral-300 text-sm font-medium rounded transition flex items-center justify-center gap-2"
+    >
+      <ArrowRightLeft size={14} />
+      Сравнить периоды (A/B)
+    </button>
+
     {#if error}
       <div class="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">
         {error}
       </div>
     {/if}
   </div>
+
+  <!-- A/B Comparison Modal -->
+  <ABComparisonModal
+    isOpen={abModalOpen}
+    availableTags={tags.map((t: any) => t.tag_name)}
+    defaultTag={selectedTags[0]}
+    onClose={() => abModalOpen = false}
+    onResult={(result) => {
+      if (onABResult) onABResult(result)
+    }}
+  />
 </div>

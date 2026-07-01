@@ -41,9 +41,10 @@
   interface Props {
     analysisResult: any
     isAnalyzing: boolean
+    forceTab?: 'overview' | 'correlations' | 'table' | 'interpretation' | null
   }
 
-  let { analysisResult, isAnalyzing }: Props = $props()
+  let { analysisResult, isAnalyzing, forceTab }: Props = $props()
 
   // Режим: single-tag или multi-tag
   
@@ -101,6 +102,15 @@ let isMultiTag = $derived(
 
   let expandedType = $state<string | null>(null)
   let activeTab = $state<'overview' | 'correlations' | 'table' | 'interpretation'>('overview')
+
+  // Переключение вкладки извне (например, после A/B анализа)
+  $effect(() => {
+    if (forceTab && forceTab !== activeTab) {
+      activeTab = forceTab
+      // Добавляем в visitedTabs чтобы вкладка отрендерилась
+      visitedTabs[forceTab] = true
+    }
+  })
   let visitedTabs = $state<Record<string, boolean>>({ overview: true })
 
   // Keep alive: запоминаем открытые вкладки чтобы не терять состояние
@@ -325,6 +335,18 @@ let isMultiTag = $derived(
   })
 
   $effect(() => {
+    if (analysisResult?.seasonality?.pattern?.pattern?.length > 0) {
+      setTimeout(() => {
+        const container = document.getElementById(patternChartId)
+        if (container) {
+          const canvas = container.querySelector('canvas')
+          if (canvas) patternChartInstance = ChartJS.getChart(canvas) || null
+        }
+      }, 200)
+    }
+  })
+
+  $effect(() => {
     if (downsampledScatterData.datasets?.length > 0) {
       setTimeout(() => {
         const container = document.getElementById(scatterChartId)
@@ -517,59 +539,49 @@ let isMultiTag = $derived(
     </div>
   {:else if analysisResult}
     <!-- Tabs -->
-    <div class="flex border-b border-neutral-200 dark:border-neutral-700 px-6 pt-3 flex-shrink-0">
+    <div class="flex items-center gap-4 px-4 py-3 flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700">
       {#if !isMultiTag}
         <button
           type="button"
           onclick={() => activeTab = 'overview'}
-          class="px-4 py-2 text-sm font-medium border-b-2 transition {activeTab === 'overview' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
+          class="border-none bg-transparent p-0 cursor-pointer text-base font-medium leading-6 transition-colors flex items-center gap-1.5 {activeTab === 'overview' ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
         >
-          <div class="flex items-center gap-1.5">
-            <TrendingUp size={14} />
-            Обзор
-          </div>
+          <TrendingUp size={16} />
+          Обзор
         </button>
         <button
           type="button"
           onclick={() => activeTab = 'interpretation'}
-          class="px-4 py-2 text-sm font-medium border-b-2 transition {activeTab === 'interpretation' ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
+          class="border-none bg-transparent p-0 cursor-pointer text-base font-medium leading-6 transition-colors flex items-center gap-1.5 {activeTab === 'interpretation' ? 'text-purple-600 dark:text-purple-400' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
         >
-          <div class="flex items-center gap-1.5">
-            <Brain size={14} />
-            Интерпретация
-          </div>
+          <Brain size={16} />
+          Интерпретация
         </button>
       {/if}
       {#if isMultiTag}
         <button
           type="button"
           onclick={() => activeTab = 'correlations'}
-          class="px-4 py-2 text-sm font-medium border-b-2 transition {activeTab === 'correlations' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
+          class="border-none bg-transparent p-0 cursor-pointer text-base font-medium leading-6 transition-colors flex items-center gap-1.5 {activeTab === 'correlations' ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
         >
-          <div class="flex items-center gap-1.5">
-            <Grid3x3 size={14} />
-            Корреляции
-          </div>
+          <Grid3x3 size={16} />
+          Корреляции
         </button>
         <button
           type="button"
           onclick={() => activeTab = 'table'}
-          class="px-4 py-2 text-sm font-medium border-b-2 transition {activeTab === 'table' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
+          class="border-none bg-transparent p-0 cursor-pointer text-base font-medium leading-6 transition-colors flex items-center gap-1.5 {activeTab === 'table' ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
         >
-          <div class="flex items-center gap-1.5">
-            <Table size={14} />
-            Таблица пар
-          </div>
+          <Table size={16} />
+          Таблица пар
         </button>
         <button
           type="button"
           onclick={() => activeTab = 'interpretation'}
-          class="px-4 py-2 text-sm font-medium border-b-2 transition {activeTab === 'interpretation' ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
+          class="border-none bg-transparent p-0 cursor-pointer text-base font-medium leading-6 transition-colors flex items-center gap-1.5 {activeTab === 'interpretation' ? 'text-purple-600 dark:text-purple-400' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
         >
-          <div class="flex items-center gap-1.5">
-            <Brain size={14} />
-            Интерпретация
-          </div>
+          <Brain size={16} />
+          Интерпретация
         </button>
       {/if}
     </div>

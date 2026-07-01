@@ -43,6 +43,7 @@
   let ddaIsAnalyzing = $state(false)
   let ddaAnalysisResult = $state<any>(null)
   let ddaError = $state<string | null>(null)
+  let ddaForceTab = $state<'overview' | 'correlations' | 'table' | 'interpretation' | null>(null)
 
   onMount(async () => {
     try { health = await getHealth() } catch (e) { console.error('Failed to fetch health:', e) }
@@ -50,6 +51,24 @@
   })
 
   
+  function handleABResult(result: any) {
+    // Добавляем ab_comparison в результат анализа для LLM интерпретации
+    if (ddaAnalysisResult) {
+      ddaAnalysisResult.ab_comparison = result
+    } else {
+      // Если анализ ещё не запущен — создаём минимальный объект
+      ddaAnalysisResult = { ab_comparison: result }
+    }
+    
+    // Переключаем на вкладку "Интерпретация"
+    ddaForceTab = 'interpretation'
+    
+    // Сбрасываем forceTab через тик чтобы можно было снова переключить
+    setTimeout(() => {
+      ddaForceTab = null
+    }, 100)
+  }
+
   async function runDDAAnalysis() {
     if (ddaSelectedTags.length === 0) {
       ddaError = 'Выберите тег для анализа'
@@ -281,6 +300,7 @@ async function handleSend(message: string) {
         onPeriodChange={(period) => ddaPeriod = period}
         onRunAnalysis={runDDAAnalysis}
         onClose={() => showDeepAnalysisPanel = false}
+        onABResult={handleABResult}
       />
     {/if}
     <div class="flex-1 flex flex-col bg-white dark:bg-neutral-900 overflow-hidden transition-colors">

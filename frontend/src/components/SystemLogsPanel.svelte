@@ -117,14 +117,14 @@
 
 <div class="w-96 border-r border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col h-full">
   <div class="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 flex items-center justify-between flex-shrink-0">
-    <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 uppercase tracking-wide">Системные логи</h2>
+    <h2 class="text-base font-semibold leading-6 text-neutral-900 dark:text-neutral-100 my-0">Системные логи</h2>
     <div class="flex items-center gap-2">
-      <button type="button" onclick={() => autoRefresh = !autoRefresh} disabled={selectedFile !== '__current__'} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-30 disabled:cursor-not-allowed {autoRefresh && selectedFile === '__current__' ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-500'}" title={selectedFile === '__current__' ? (autoRefresh ? 'Автообновление вкл' : 'Автообновление выкл') : 'Только для текущего лога'}>
+      <button type="button" onclick={() => autoRefresh = !autoRefresh} disabled={selectedFile !== '__current__'} class="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition disabled:opacity-30 disabled:cursor-not-allowed {autoRefresh && selectedFile === '__current__' ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-500'}" title={selectedFile === '__current__' ? (autoRefresh ? 'Автообновление вкл' : 'Автообновление выкл') : 'Только для текущего лога'}>
         <RefreshCw size={16} class={autoRefresh && selectedFile === '__current__' ? 'animate-spin' : ''} />
       </button>
-      <button type="button" onclick={exportLogs} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition text-neutral-500 hover:text-blue-600" title="Экспорт в TXT"><Download size={16} /></button>
-      <button type="button" onclick={clearBuffer} disabled={selectedFile !== '__current__'} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition text-neutral-500 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed" title="Очистить буфер"><Trash2 size={16} /></button>
-      {#if onClose}<button type="button" onclick={onClose} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition text-neutral-500 hover:text-neutral-700" title="Закрыть панель"><X size={16} /></button>{/if}
+      <button type="button" onclick={exportLogs} class="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition text-neutral-500 hover:text-blue-600" title="Экспорт в TXT"><Download size={16} /></button>
+      <button type="button" onclick={clearBuffer} disabled={selectedFile !== '__current__'} class="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition text-neutral-500 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed" title="Очистить буфер"><Trash2 size={16} /></button>
+      {#if onClose}<button type="button" onclick={onClose} class="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition text-neutral-500 hover:text-neutral-700" title="Закрыть панель"><X size={16} /></button>{/if}
     </div>
   </div>
 
