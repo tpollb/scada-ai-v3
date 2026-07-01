@@ -101,12 +101,12 @@ let isMultiTag = $derived(
 
   let expandedType = $state<string | null>(null)
   let activeTab = $state<'overview' | 'correlations' | 'table' | 'interpretation'>('overview')
-  let visitedTabs = $state(new Set<string>(['overview']))
+  let visitedTabs = $state<Record<string, boolean>>({ overview: true })
 
   // Keep alive: запоминаем открытые вкладки чтобы не терять состояние
   $effect(() => {
-    if (activeTab) {
-      visitedTabs.add(activeTab)
+    if (activeTab && !visitedTabs[activeTab]) {
+      visitedTabs[activeTab] = true
     }
   })
 
@@ -1371,7 +1371,7 @@ let isMultiTag = $derived(
         </div>
       {/if}
     </div>
-      {#if visitedTabs.has('interpretation')}
+      {#if visitedTabs.interpretation}
         <div class:hidden={activeTab !== 'interpretation'}>
           <DDAInterpretation {analysisResult} />
         </div>
