@@ -1,6 +1,17 @@
 # Changelog
 
 ## v3.2.9 (2026-07-01)
+## v3.2.9.1 (2026-07-08)
+
+### Fixes
+- **DDA**: Исправлен UnicodeEncodeError при логировании результатов анализа с символами ↔ и другими Unicode
+- **DDA**: Исправлены кнопки зума (+/-/reset/download) на графике "Типичный паттерн" для multi-tag анализа
+  - Заменён единый `patternChartInstance` на `patternChartInstances: Record<string, ChartJS>`
+  - Уникальный ID для каждого графика в цикле
+  - Функции zoom принимают `tagKey` параметр
+
+### Known Issues
+- Health модуль: если SCADA не пишет данные последние 24 часа, отображаются нули (данные есть, но старые)
 
 **Added**
 

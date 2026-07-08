@@ -131,7 +131,7 @@ let isMultiTag = $derived(
   const tsChartId = `dda-ts-${Math.random().toString(36).slice(2, 9)}`
   const scatterChartId = `dda-scatter-${Math.random().toString(36).slice(2, 9)}`
   const patternChartId = `dda-pattern-${Math.random().toString(36).slice(2, 9)}`
-  let patternChartInstance: ChartJS | null = $state(null)
+  let patternChartInstances: Record<string, ChartJS> = $state({})
   // ChartModal state
   let modalOpen = $state(false)
   let modalChartType = $state<'line' | 'bar'>('line')
@@ -337,12 +337,31 @@ let isMultiTag = $derived(
   $effect(() => {
     if (analysisResult?.seasonality?.pattern?.pattern?.length > 0) {
       setTimeout(() => {
-        const container = document.getElementById(patternChartId)
-        if (container) {
-          const canvas = container.querySelector('canvas')
-          if (canvas) patternChartInstance = ChartJS.getChart(canvas) || null
+        const newInstances: Record<string, ChartJS> = {}
+        // Single-tag pattern
+        const singleContainer = document.getElementById(patternChartId)
+        if (singleContainer) {
+          const canvas = singleContainer.querySelector('canvas')
+          if (canvas) {
+            const chart = ChartJS.getChart(canvas)
+            if (chart) newInstances['single'] = chart
+          }
         }
-      }, 200)
+        // Multi-tag patterns (каждый тег)
+        if (analysisResult?.tags && Array.isArray(analysisResult.tags)) {
+          analysisResult.tags.forEach((tag: string) => {
+            const multiContainer = document.getElementById(`pattern-chart-${tag}`)
+            if (multiContainer) {
+              const canvas = multiContainer.querySelector('canvas')
+              if (canvas) {
+                const chart = ChartJS.getChart(canvas)
+                if (chart) newInstances[tag] = chart
+              }
+            }
+          })
+        }
+        patternChartInstances = newInstances
+      }, 300)
     }
   })
 
@@ -389,24 +408,27 @@ let isMultiTag = $derived(
   }
 
   // === Pattern chart controls ===
-  function zoomInPattern() {
+  function zoomInPattern(tagKey: string = 'single') {
     try {
-      if (patternChartInstance && typeof patternChartInstance.zoom === 'function') {
-        patternChartInstance.zoom(1.2)
+      const chart = patternChartInstances[tagKey]
+      if (chart && typeof chart.zoom === 'function') {
+        chart.zoom(1.2)
       }
     } catch (e) { console.warn('Pattern zoom in failed:', e) }
   }
-  function zoomOutPattern() {
+  function zoomOutPattern(tagKey: string = 'single') {
     try {
-      if (patternChartInstance && typeof patternChartInstance.zoom === 'function') {
-        patternChartInstance.zoom(0.8)
+      const chart = patternChartInstances[tagKey]
+      if (chart && typeof chart.zoom === 'function') {
+        chart.zoom(0.8)
       }
     } catch (e) { console.warn('Pattern zoom out failed:', e) }
   }
-  function resetZoomPattern() {
+  function resetZoomPattern(tagKey: string = 'single') {
     try {
-      if (patternChartInstance && typeof patternChartInstance.resetZoom === 'function') {
-        patternChartInstance.resetZoom()
+      const chart = patternChartInstances[tagKey]
+      if (chart && typeof chart.resetZoom === 'function') {
+        chart.resetZoom()
       }
     } catch (e) { console.warn('Pattern reset zoom failed:', e) }
   }
@@ -742,10 +764,10 @@ let isMultiTag = $derived(
                 Типичный паттерн (период {analysisResult.seasonality.periods.detected_periods[0].period} точек, {formatPeriod(analysisResult.seasonality.periods.detected_periods[0].period)})
               </div>
               <div class="flex items-center gap-1">
-                <button type="button" onclick={zoomInPattern} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить"><ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                <button type="button" onclick={zoomOutPattern} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                <button type="button" onclick={resetZoomPattern} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                <button type="button" onclick={() => downloadPNG(patternChartInstance, 'pattern')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+                <button type="button" onclick={() => zoomInPattern('single')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить"><ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+                <button type="button" onclick={() => zoomOutPattern('single')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+                <button type="button" onclick={() => resetZoomPattern('single')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+                <button type="button" onclick={() => downloadPNG(patternChartInstances['single'], 'pattern')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
                 <button type="button" onclick={() => openPatternModal(pattern, 'Типичный паттерн')} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Полноэкранный режим"><Maximize2 size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
               </div>
             </div>
@@ -1088,17 +1110,17 @@ let isMultiTag = $derived(
                     Типичный паттерн (период {tagSeasonality.periods.detected_periods[0].period} точек, {formatPeriod(tagSeasonality.periods.detected_periods[0].period)})
                   </div>
                   <div class="flex items-center gap-1">
-                    <button type="button" onclick={zoomInPattern} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить"><ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                    <button type="button" onclick={zoomOutPattern} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                    <button type="button" onclick={resetZoomPattern} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
-                    <button type="button" onclick={() => downloadPNG(patternChartInstance, `pattern_${tagName}`)} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+                    <button type="button" onclick={() => zoomInPattern(tagName)} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Приблизить"><ZoomIn size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+                    <button type="button" onclick={() => zoomOutPattern(tagName)} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Отдалить"><ZoomOut size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+                    <button type="button" onclick={() => resetZoomPattern(tagName)} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Сбросить"><RotateCcw size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
+                    <button type="button" onclick={() => downloadPNG(patternChartInstances[tagName], `pattern_${tagName}`)} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Скачать PNG"><Download size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
                     <button type="button" onclick={() => openPatternModal(pattern, `Паттерн: ${tagName}`)} class="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition" title="Полноэкранный режим"><Maximize2 size={14} class="text-neutral-600 dark:text-neutral-400" /></button>
                   </div>
                 </div>
                 <div class="text-xs text-neutral-600 dark:text-neutral-400 mb-2">
                   Мин: {stats.min.toFixed(1)} | Макс: {stats.max.toFixed(1)} | Размах: {stats.range.toFixed(1)}
                 </div>
-                <div id={patternChartId} class="h-40 bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700 p-3">
+                <div id={`pattern-chart-${tagName}`} class="h-40 bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700 p-3">
                   <Line data={patternData} options={{...timeSeriesOptions, plugins: {...timeSeriesOptions.plugins, legend: {display: false}}}} key={`pattern-multi-${tagName}`} />
                 </div>
               </div>

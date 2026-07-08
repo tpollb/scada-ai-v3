@@ -430,7 +430,9 @@ async def run_analysis(request: AnalysisRequest):
                 history_path=history_path
             )
         
-        log.info("Analysis completed", id=analysis_id, summary=summary[:100])
+        # Sanitize summary для Windows cp1251 (убираем Unicode стрелки и прочее)
+        safe_summary = summary[:100].encode('ascii', 'replace').decode('ascii')
+        log.info("Analysis completed", id=analysis_id, summary=safe_summary)
         return response
     
     except HTTPException:
