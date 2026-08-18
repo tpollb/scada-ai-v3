@@ -1,70 +1,69 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Project-specific ignores
+PROJECT_CONTEXT.md
+
+# Dependencies
+node_modules/
 venv/
-ENV/
-env/
 .venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+target/
+.gradle/
 
-# Environment
-.env
-.env.local
-.env.*.local
+# Compiled files
+*.pyc
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
 
-# IDE
+# Editor/IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+*.tmp
 
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-.svelte-kit/
-.vercel/
-.netlify/
-
-# Build outputs
-frontend/dist/
-frontend/.svelte-kit/
-
-# OS
+# System files
 .DS_Store
 Thumbs.db
+.env
+.env.local
+*.env.*
 
-# Logs
+# Logs and coverage
 *.log
-logs/
+coverage/
+htmlcov/
+.coverage
 
-# Database
-*.db
-*.sqlite3
-
-# Temporary
-tmp/
-temp/
-
-# Local env (contains secrets)
-backend/.env
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
