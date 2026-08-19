@@ -1,3 +1,4 @@
+```
 # Python
 __pycache__/
 *.py[cod]
@@ -19,36 +20,20 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-venv/
-ENV/
-env/
-.venv/
+MANIFEST
 
-# Environment
-.env
-.env.local
-.env.*.local
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-.svelte-kit/
-.vercel/
-.netlify/
-
-# Build outputs
-frontend/dist/
-frontend/.svelte-kit/
 
 # OS
 .DS_Store
@@ -56,15 +41,25 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
 
-# Database
-*.db
-*.sqlite3
+# Coverage
+.coverage
+coverage/
+htmlcov/
 
-# Temporary
-tmp/
-temp/
+# Environment variables
+.env
+.env.local
+*.env.*
 
-# Local env (contains secrets)
-backend/.env
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# PyTest
+.pytest_cache/
+
+# Build
+target/
+```

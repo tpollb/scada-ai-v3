@@ -1,4 +1,4 @@
-"""SCADA.AI v3.2.9.1 — Main application"""
+"""SCADA.AI v3.3.0 — Main application"""
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,6 +66,14 @@ async def lifespan(app: FastAPI):
         log.info("LLM provider ready", provider=provider.provider_name)
     except Exception as e:
         log.error("LLM provider failed to initialize", error=str(e))
+
+    # Инициализируем пользователей по умолчанию
+    try:
+        from core.auth import auth_service
+        await auth_service.init_default_users()
+        log.info("Auth service initialized with default users")
+    except Exception as e:
+        log.error("Auth service initialization failed", error=str(e))
 
     yield
 
@@ -138,7 +146,7 @@ async def debug_routes():
 # ============================================================================
 # Подключаем роутеры
 # ============================================================================
-from api.routes import chat, config, health, system, docs, energy, analytics, deep_analysis  # noqa: E402
+from api.routes import chat, config, health, system, docs, energy, analytics, deep_analysis, auth  # noqa: E402
 
 app.include_router(chat.router, tags=["chat"])
 app.include_router(config.router, tags=["config"])
@@ -148,8 +156,9 @@ app.include_router(docs.router)
 app.include_router(energy.router)
 app.include_router(analytics.router)
 app.include_router(deep_analysis.router)
-
-app.include_router(deep_analysis.router)
+app.include_router(auth.router)
+app.include_router(auth.users_router)
+app.include_router(auth.roles_router)
 
 
 log.info("All routers registered")
