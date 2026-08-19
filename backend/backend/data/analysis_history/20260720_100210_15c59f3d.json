@@ -1,0 +1,148 @@
+{
+  "analysis_id": "20260720_100210_15c59f3d",
+  "created_at": "2026-07-20T10:02:10.717665",
+  "params": {
+    "tags": [
+      "AIR0-1-Online",
+      "R201-VOC"
+    ],
+    "period": "30 days",
+    "start_date": "2026-06-20T10:02:08.992690",
+    "end_date": "2026-07-20T10:02:08.992690",
+    "options": {
+      "anomalies": true,
+      "correlations": false,
+      "seasonality": false,
+      "compare_periods": false
+    }
+  },
+  "results": {
+    "correlation_matrix": {
+      "tags": [
+        "AIR0-1-Online",
+        "R201-VOC"
+      ],
+      "matrix": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0
+        ]
+      ],
+      "p_values": [
+        [
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0
+        ]
+      ],
+      "method": "pearson"
+    },
+    "pair_analysis": {
+      "tag_x": "AIR0-1-Online",
+      "tag_y": "R201-VOC",
+      "pearson": {
+        "coefficient": 0.0,
+        "p_value": 1.0,
+        "interpretation": "недостаточно данных"
+      },
+      "spearman": {
+        "coefficient": 0.0,
+        "p_value": 1.0,
+        "interpretation": "недостаточно данных"
+      },
+      "mutual_info": {
+        "mi": 0.0,
+        "normalized": 0.0,
+        "interpretation": "недостаточно данных"
+      },
+      "cross_correlation": {
+        "max_correlation": 0.0,
+        "optimal_lag": 0,
+        "interpretation": "недостаточно данных"
+      },
+      "scatter_data": {
+        "x": [],
+        "y": []
+      }
+    },
+    "seasonal_analysis": {
+      "AIR0-1-Online": {
+        "periods": {
+          "detected_periods": [],
+          "error": "insufficient_valid_data"
+        },
+        "decomposition": null,
+        "pattern": null
+      },
+      "R201-VOC": {
+        "periods": {
+          "detected_periods": [],
+          "fft_peaks": [
+            {
+              "frequency": 0.002777456312926745,
+              "period": 360.04166666666663,
+              "power": 1.0
+            },
+            {
+              "frequency": 0.006943640782316862,
+              "period": 144.01666666666665,
+              "power": 0.8635910219099698
+            },
+            {
+              "frequency": 0.01110982525170698,
+              "period": 90.01041666666666,
+              "power": 0.820829834370555
+            },
+            {
+              "frequency": 0.02221965050341396,
+              "period": 45.00520833333333,
+              "power": 0.8046389949971194
+            },
+            {
+              "frequency": 0.018053466034023843,
+              "period": 55.39102564102563,
+              "power": 0.8044721978350786
+            },
+            {
+              "frequency": 0.026385834972804077,
+              "period": 37.89912280701754,
+              "power": 0.8004290523841053
+            },
+            {
+              "frequency": 0.013887281564633725,
+              "period": 72.00833333333333,
+              "power": 0.797631976676636
+            },
+            {
+              "frequency": 0.030552019442194194,
+              "period": 32.7310606060606,
+              "power": 0.7936372509784203
+            },
+            {
+              "frequency": 0.041661844693901176,
+              "period": 24.002777777777773,
+              "power": 0.7924028523491078
+            },
+            {
+              "frequency": 0.045828029163291296,
+              "period": 21.820707070707066,
+              "power": 0.7910783066450797
+            }
+          ],
+          "autocorr_peaks": [],
+          "sampling_rate": 12.0,
+          "n_points": 8641
+        },
+        "decomposition": null,
+        "pattern": null
+      }
+    }
+  }
+}

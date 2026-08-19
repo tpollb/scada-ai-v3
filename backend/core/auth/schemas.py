@@ -33,7 +33,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     """Схема ответа с данными пользователя"""
     id: int
-    created_at: datetime
+    created_at: datetime | None = None
     updated_at: Optional[datetime] = None
     
     class Config:
@@ -53,7 +53,7 @@ class RoleResponse(BaseModel):
     name: str
     description: Optional[str] = None
     permissions: List[str] = []
-    created_at: datetime
+    created_at: datetime | None = None
     
     class Config:
         from_attributes = True

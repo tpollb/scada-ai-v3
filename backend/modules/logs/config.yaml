@@ -1,0 +1,11 @@
+name: logs
+version: "1.0.0"
+description: "Система логирования, мониторинг событий и AI-анализ журнала"
+author: "iRidi"
+enabled: true
+
+settings:
+  poll_interval_ms: 2000
+  max_entries: 500
+  retention_hours: 24
+  auto_clear: false
