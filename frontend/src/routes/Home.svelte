@@ -4,6 +4,7 @@
   import { messages, isLoading, addMessage } from '../stores/chat'
   import { navigate } from '../stores/ui'
   import { theme } from '../stores/theme'
+  import { auth, hasAnyPermission, hasAllPermissions, isRole } from '../stores/auth'
   import Input from '../components/Input.svelte'
   import SystemLogsPanel from '../components/SystemLogsPanel.svelte'
   import DeepAnalysisControls from '../components/DeepAnalysisControls.svelte'
@@ -44,6 +45,21 @@
   let ddaAnalysisResult = $state<any>(null)
   let ddaError = $state<string | null>(null)
   let ddaForceTab = $state<'overview' | 'correlations' | 'table' | 'interpretation' | null>(null)
+
+  // Проверка прав доступа к функционалу
+  const canViewHealth = hasAnyPermission(['health:view'])
+  const canConfigureHealth = hasAllPermissions(['health:configure'])
+  const canViewAnalytics = hasAnyPermission(['analytics:view'])
+  const canConfigureAnalytics = hasAllPermissions(['analytics:configure'])
+  const canViewEnergy = hasAnyPermission(['energy:view'])
+  const canConfigureEnergy = hasAllPermissions(['energy:configure'])
+  const canViewLogs = hasAnyPermission(['logs:view'])
+  const canConfigureLogs = hasAllPermissions(['logs:configure'])
+  const canViewConfig = hasAnyPermission(['config:view'])
+  const canEditConfig = hasAllPermissions(['config:edit'])
+  const canViewUsers = hasAnyPermission(['users:view'])
+  const canManageUsers = hasAllPermissions(['users:create', 'users:edit', 'users:delete'])
+  const canViewAudit = hasAnyPermission(['audit:view'])
 
   onMount(async () => {
     try { health = await getHealth() } catch (e) { console.error('Failed to fetch health:', e) }
