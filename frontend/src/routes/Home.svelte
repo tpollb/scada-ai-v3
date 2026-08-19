@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { getHealth } from '../lib/api'
+  import api, { type HealthData } from '../lib/api'
   import { messages, isLoading, addMessage } from '../stores/chat'
   import { navigate } from '../stores/ui'
   import { theme } from '../stores/theme'
@@ -11,7 +11,6 @@
   import DeepAnalysisResults from '../components/DeepAnalysisResults.svelte'
   import NarrativePanel from '../components/NarrativePanel.svelte'
   import WidgetRouter from '../components/WidgetRouter.svelte'
-  import api from '../lib/api'
   import { Settings, Volume2, Database, Cpu, Zap, Clock, CheckCircle, XCircle, AlertCircle, Sun, Moon, Terminal, Wrench, Package, ChevronDown, ChevronUp , Activity } from 'lucide-svelte'
 
   interface SystemInfo {
@@ -62,7 +61,7 @@
   const canViewAudit = hasAnyPermission(['audit:view'])
 
   onMount(async () => {
-    try { health = await getHealth() } catch (e) { console.error('Failed to fetch health:', e) }
+    try { health = await api.getHealth() } catch (e) { console.error('Failed to fetch health:', e) }
     try { systemInfo = await api.get('system/info').json<SystemInfo>() } catch (e) { console.error('Failed to fetch system info:', e) }
   })
 
