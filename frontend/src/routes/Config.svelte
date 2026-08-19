@@ -4,9 +4,16 @@
   import { navigate } from '../stores/ui'
   import { Activity, AlertCircle, ArrowLeft, CheckCircle, Database, DollarSign, Droplet, Edit2, FileText, Flame, Key, Moon, Plus, RefreshCw, Save, Server, Sun, Trash2, Wrench, Zap } from 'lucide-svelte'
   import { theme } from '../stores/theme'
+  import { auth, hasAnyPermission, hasAllPermissions } from '../stores/auth'
   import api from '../lib/api'
   import DocsViewer from '../components/DocsViewer.svelte'
   import DDAConfigPanel from '../components/config/DDAConfigPanel.svelte'
+
+  // Проверка прав доступа к конфигурации
+  const canViewConfig = hasAnyPermission(['config:view'])
+  const canEditConfig = hasAllPermissions(['config:edit'])
+  const canManageUsers = hasAllPermissions(['users:create', 'users:edit', 'users:delete'])
+  const canViewAudit = hasAnyPermission(['audit:view'])
 
   interface ModuleInfo {
     name: string
